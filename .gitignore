@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 @"
 .env
 .env.*
@@ -29,3 +30,13 @@ Thumbs.db
 
 *.log
 "@ | Out-File -FilePath .gitignore -Encoding utf8
+=======
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+*.pyc
+.dart_tool/
+build/
+*.rejected
+>>>>>>> origin/development
