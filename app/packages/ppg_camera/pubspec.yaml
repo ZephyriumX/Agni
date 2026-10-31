@@ -1,0 +1,19 @@
+name: ppg_camera
+description: Native Android Camera2 raw-frame PPG capture (60 fps, torch, manual exposure, sensor timestamps).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.agnipulse.ppg_camera
+        pluginClass: PpgCameraPlugin
