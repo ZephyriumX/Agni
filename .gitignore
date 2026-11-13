@@ -1,36 +1,3 @@
-<<<<<<< HEAD
-@"
-.env
-.env.*
-!.env.example
-**/.env
-**/.env.*
-!**/.env.example
-
-.venv/
-venv/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-build/
-**/build/
-.flutter_build/
-
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
-
-*.log
-"@ | Out-File -FilePath .gitignore -Encoding utf8
-=======
 __pycache__/
 .pytest_cache/
 .venv/
@@ -39,4 +6,3 @@ __pycache__/
 .dart_tool/
 build/
 *.rejected
->>>>>>> origin/development

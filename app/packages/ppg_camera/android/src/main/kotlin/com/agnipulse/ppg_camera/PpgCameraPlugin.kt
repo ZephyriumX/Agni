@@ -43,7 +43,8 @@ class PpgCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventCha
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "capabilities" -> try {
-                result.success(CameraCaps.query(ctx))
+                val tf = call.argument<Int>("targetFps") ?: 60
+                result.success(CameraCaps.query(ctx, tf, call.argument<Int>("minFps") ?: tf))
             } catch (e: Exception) {
                 result.error("CAPS_FAILED", e.message, null)
             }
@@ -53,7 +54,7 @@ class PpgCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventCha
                 }
                 session?.stop()
                 val fps = call.argument<Int>("targetFps") ?: 60
-                val s = PpgSession(ctx, fps) { batch -> main.post { sink?.success(batch) } }
+                val s = PpgSession(ctx, fps, call.argument<Int>("minFps") ?: fps) { batch -> main.post { sink?.success(batch) } }
                 session = s
                 s.start({ info -> main.post { result.success(info) } },
                         { code, msg -> main.post { session = null; result.error(code, msg, null) } })

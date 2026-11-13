@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 analyzer:
   exclude:
     - build/**
     - android/**
-=======
->>>>>>> origin/development
 include: package:flutter_lints/flutter.yaml

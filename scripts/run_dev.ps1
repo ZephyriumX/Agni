@@ -7,7 +7,7 @@
 param([string]$DatabaseUrl = $env:DATABASE_URL, [switch]$Memory, [switch]$Lan, [int]$Port = 8000)
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..\backend')
-if (-not (Test-Path .venv)) { py -3.13 -m venv .venv }
+if (-not (Test-Path .venv)) { python -m venv .venv }
 & .\.venv\Scripts\python -m pip install -q -r requirements.txt
 $env:AGNI_ENV = 'development'
 if ($Memory) { $env:AGNI_STORAGE = 'memory' }
