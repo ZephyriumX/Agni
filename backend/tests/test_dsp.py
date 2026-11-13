@@ -62,15 +62,15 @@ def test_percent_change_sign_convention():
 
 
 def test_acquisition_check_rejects_slow_and_dropped():
-    with pytest.raises(d.SignalError, match="NOT"):
-        d.acquisition_check(np.arange(0, 35, 1 / 30))
+    def rejected(t):
+        with pytest.raises(d.SignalError) as ei:
+            d.acquisition_check(t)
+        return {r["code"] for r in ei.value.report["reasons"]} if hasattr(ei.value, "report") else set()
+    assert "fps_too_low" in rejected(np.arange(0, 35, 1 / 30))
     t = np.arange(0, 35, 1 / 60)
-    with pytest.raises(d.SignalError, match="dropped"):
-        d.acquisition_check(np.delete(t, np.arange(100, 900, 2)))       # ~19% dropped
-    with pytest.raises(d.SignalError, match="dropped"):
-        d.acquisition_check(np.delete(t, np.arange(500, 520)))          # 330 ms hole
-    with pytest.raises(d.SignalError):
-        d.acquisition_check(np.r_[t[:50], t[49:60], t[60:]])            # duplicate timestamp
+    assert "too_many_drops" in rejected(np.delete(t, np.arange(100, 900, 2)))       # ~19% dropped
+    assert "long_gap" in rejected(np.delete(t, np.arange(500, 520)))                # 330 ms hole
+    assert "timestamps_not_monotonic" in rejected(np.r_[t[:50], t[49:60], t[60:]])  # duplicate timestamp
     assert d.acquisition_check(t)["fs_mean"] == pytest.approx(60, abs=0.1)
 
 

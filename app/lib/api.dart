@@ -2,12 +2,28 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'capture_validation.dart';
 import 'config.dart';
 
-const scanTags = ['Baseline', 'Post-Meal', 'Post-Vajrasana', 'Caffeine', 'Stress', 'Poor-Sleep', 'Pre-Yoga'];
+const scanTags = [
+  'Baseline',
+  'Post-Meal',
+  'Post-Vajrasana',
+  'Caffeine',
+  'Stress',
+  'Poor-Sleep',
+  'Pre-Yoga'
+];
 const contextTags = ['Caffeine', 'Stress', 'Poor-Sleep'];
 
-enum ApiErrorKind { timeout, unreachable, unauthorized, rejected, server, other }
+enum ApiErrorKind {
+  timeout,
+  unreachable,
+  unauthorized,
+  rejected,
+  server,
+  other
+}
 
 class ApiError implements Exception {
   final ApiErrorKind kind;
@@ -20,7 +36,8 @@ class ApiError implements Exception {
   bool get retryable =>
       kind == ApiErrorKind.timeout ||
       kind == ApiErrorKind.unreachable ||
-      (kind == ApiErrorKind.server && (status == 503 || status == 502 || status == 504));
+      (kind == ApiErrorKind.server &&
+          (status == 503 || status == 502 || status == 504));
 
   @override
   String toString() => message;
@@ -41,12 +58,15 @@ class Api {
     final host = Uri.tryParse(base)?.host ?? '';
     final lines = <String>['Cannot reach the server at $base.'];
     if (host == '10.0.2.2') {
-      lines.add('10.0.2.2 only works inside the Android emulator. On a physical phone use '
+      lines.add(
+          '10.0.2.2 only works inside the Android emulator. On a physical phone use '
           'http://127.0.0.1:8000 with "adb reverse tcp:8000 tcp:8000", or your PC\'s Wi-Fi IP.');
     } else if (host == '127.0.0.1' || host == 'localhost') {
-      lines.add('Run on the PC (USB debugging on): adb reverse tcp:8000 tcp:8000');
+      lines.add(
+          'Run on the PC (USB debugging on): adb reverse tcp:8000 tcp:8000');
     } else {
-      lines.add('Check: server started with --host 0.0.0.0, phone and PC on the same Wi-Fi (no guest/AP '
+      lines.add(
+          'Check: server started with --host 0.0.0.0, phone and PC on the same Wi-Fi (no guest/AP '
           'isolation), Windows Firewall allows inbound TCP 8000 on the Private profile.');
     }
     lines.add('Details: $e');
@@ -54,9 +74,15 @@ class Api {
   }
 
   static Future<http.Response> _send(String method, String path,
-      {Map<String, dynamic>? body, bool auth = true, Duration? timeout, Map<String, String>? extra}) async {
+      {Map<String, dynamic>? body,
+      bool auth = true,
+      Duration? timeout,
+      Map<String, String>? extra}) async {
     final base = await AppConfig.baseUrl();
-    final headers = <String, String>{'Content-Type': 'application/json', ...?extra};
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      ...?extra
+    };
     if (auth) {
       final t = await AppConfig.token();
       if (t != null) headers['Authorization'] = 'Bearer $t';
@@ -90,14 +116,20 @@ class Api {
     }
     if (r.statusCode >= 200 && r.statusCode < 300) return body;
     var detail = body is Map ? body['detail'] : null;
-    if (detail is List) detail = detail.map((e) => e is Map ? e['msg'] : '$e').join('; ');
+    if (detail is List)
+      detail = detail.map((e) => e is Map ? e['msg'] : '$e').join('; ');
     final code = body is Map ? body['code'] as String? : null;
     final msg = detail is String ? detail : 'Server error ${r.statusCode}';
     if (r.statusCode == 401 || r.statusCode == 403) {
-      throw ApiError(ApiErrorKind.unauthorized, msg, status: r.statusCode, code: code);
+      throw ApiError(ApiErrorKind.unauthorized, msg,
+          status: r.statusCode, code: code);
     }
-    if (r.statusCode == 422 || r.statusCode == 400 || r.statusCode == 404 || r.statusCode == 413) {
-      throw ApiError(ApiErrorKind.rejected, msg, status: r.statusCode, code: code);
+    if (r.statusCode == 422 ||
+        r.statusCode == 400 ||
+        r.statusCode == 404 ||
+        r.statusCode == 413) {
+      throw ApiError(ApiErrorKind.rejected, msg,
+          status: r.statusCode, code: code);
     }
     throw ApiError(ApiErrorKind.server, msg, status: r.statusCode, code: code);
   }
@@ -111,7 +143,8 @@ class Api {
         auth: false,
         extra: key.isEmpty ? null : {'X-Registration-Key': key});
     final j = Map<String, dynamic>.from(_parse(r));
-    await AppConfig.saveCredentials(j['user_id'] as String, j['token'] as String);
+    await AppConfig.saveCredentials(
+        j['user_id'] as String, j['token'] as String);
   }
 
   static Future<Map<String, dynamic>> me() async {
@@ -131,7 +164,8 @@ class Api {
     steps.add(DiagStep('API address', true, base));
     try {
       final h = _parse(await _send('GET', '/health', auth: false));
-      steps.add(DiagStep('Server reachable (/health)', true, 'v${h['version']} env=${h['env']} auth=${h['auth_mode']}'));
+      steps.add(DiagStep('Server reachable (/health)', true,
+          'v${h['version']} env=${h['env']} auth=${h['auth_mode']}'));
     } on ApiError catch (e) {
       steps.add(DiagStep('Server reachable (/health)', false, e.message));
       return steps;
@@ -153,28 +187,46 @@ class Api {
   }
 
   // ---- scans
-  static Future<Map<String, dynamic>> processScan(Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> processScan(
+      Map<String, dynamic> payload) async {
     await ensureRegistered();
-    final r = await _send('POST', '/api/v1/scan/process', body: payload, timeout: _long);
+    final r = await _send('POST', '/api/v1/scan/process',
+        body: payload, timeout: _long);
     return Map<String, dynamic>.from(_parse(r));
+  }
+
+  /// Server-side FPS/timing thresholds. Public endpoint; on any failure the bundled defaults (identical to
+  /// the backend defaults) are used so scanning keeps working offline.
+  static Future<CaptureConfig> captureConfig() async {
+    try {
+      final r = await _send('GET', '/api/v1/capture-config',
+          auth: false, timeout: const Duration(seconds: 2));
+      return CaptureConfig.fromJson(Map<String, dynamic>.from(_parse(r)));
+    } catch (_) {
+      return CaptureConfig.defaults;
+    }
   }
 
   static Future<Map<String, dynamic>> createMeal(String name) async {
     await ensureRegistered();
-    return Map<String, dynamic>.from(_parse(await _send('POST', '/api/v1/meals', body: {'name': name})));
+    return Map<String, dynamic>.from(
+        _parse(await _send('POST', '/api/v1/meals', body: {'name': name})));
   }
 
   static Future<Map<String, dynamic>> scan(String id) async =>
-      Map<String, dynamic>.from(_parse(await _send('GET', '/api/v1/scans/$id')));
+      Map<String, dynamic>.from(
+          _parse(await _send('GET', '/api/v1/scans/$id')));
 
   static Future<Map<String, dynamic>> report() async {
     await ensureRegistered();
     final uid = await AppConfig.userId();
-    return Map<String, dynamic>.from(_parse(await _send('GET', '/api/v1/reports/$uid')));
+    return Map<String, dynamic>.from(
+        _parse(await _send('GET', '/api/v1/reports/$uid')));
   }
 
   static Future<Map<String, dynamic>> diary() async {
     await ensureRegistered();
-    return Map<String, dynamic>.from(_parse(await _send('GET', '/api/v1/diary')));
+    return Map<String, dynamic>.from(
+        _parse(await _send('GET', '/api/v1/diary')));
   }
 }

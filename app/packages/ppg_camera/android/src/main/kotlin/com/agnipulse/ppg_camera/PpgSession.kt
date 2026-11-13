@@ -25,6 +25,7 @@ import kotlin.math.pow
 class PpgSession(
     private val ctx: Context,
     private val targetFps: Int,
+    private val minFps: Int = targetFps,
     private val emit: (Map<String, Any?>) -> Unit,
 ) {
     private val thread = HandlerThread("ppg-camera").also { it.start() }
@@ -53,11 +54,13 @@ class PpgSession(
     @SuppressLint("MissingPermission")
     fun start(onOk: (Map<String, Any?>) -> Unit, onErr: (String, String) -> Unit) {
         val mgr = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val pick = CameraCaps.pick(ctx, targetFps)
+        val pick = CameraCaps.pick(ctx, targetFps, minFps)
         if (pick == null) {
-            onErr("FPS_UNSUPPORTED", "No back camera with flash can stream YUV at >= $targetFps fps on this device")
+            onErr("FPS_UNSUPPORTED", "No back camera with flash can stream YUV at >= $minFps fps on this device")
             return
         }
+        // Ask for what the stream can really do: never a shorter frame duration than its hardware minimum.
+        frameNs = max(frameNs, (1e9 / pick.maxFps).toLong())
         val ch = mgr.getCameraCharacteristics(pick.id)
         manual = pick.manual
         ch.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)?.let { isoMin = it.lower; isoMax = min(it.upper, 1600) }
@@ -104,7 +107,7 @@ class PpgSession(
         } else {
             // Fallback: auto exposure with the tightest fps range reaching the target, lowest compensation
             val ranges = ch.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES) ?: emptyArray()
-            val r = ranges.filter { it.upper >= targetFps }
+            val r = ranges.filter { it.upper >= targetFps }.ifEmpty { ranges.filter { it.upper >= minFps } }
                 .sortedWith(compareBy({ it.upper - it.lower }, { -it.lower })).firstOrNull()
             if (r != null) b.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, r)
             ch.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)?.let {
@@ -123,7 +126,8 @@ class PpgSession(
                     }
                 }, bg)
                 onOk(mapOf("cameraId" to pick.id, "width" to pick.width, "height" to pick.height,
-                    "streamMaxFps" to pick.maxFps, "manualExposure" to manual, "targetFps" to targetFps))
+                    "streamMaxFps" to pick.maxFps, "manualExposure" to manual, "targetFps" to targetFps,
+                    "minFps" to minFps, "platform" to "android"))
             }
             override fun onConfigureFailed(s: CameraCaptureSession) { onErr("SESSION_FAILED", "configure failed") }
         }, bg)

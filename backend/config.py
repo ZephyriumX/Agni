@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
+from capture_validation import DEFAULT_CAPTURE_CONFIG, CaptureConfig
+
 
 def _csv(name: str) -> list[str]:
     return [x.strip() for x in os.getenv(name, "").split(",") if x.strip()]
@@ -22,6 +24,7 @@ class Settings:
     max_body_bytes: int = 2_000_000          # ~35 s @ 60 Hz x3 channels is ~150 kB
     max_samples: int = 60 * 130              # 130 s @ 60 fps hard cap
     register_per_hour: int = 30
+    capture: CaptureConfig = DEFAULT_CAPTURE_CONFIG   # FPS/timing policy; AGNI_CAPTURE_* env overrides
 
     @staticmethod
     def load() -> "Settings":
@@ -35,6 +38,7 @@ class Settings:
             supabase_jwt_secret=os.getenv("SUPABASE_JWT_SECRET", ""),
             cors_origins=_csv("AGNI_CORS_ORIGINS"),
             max_body_bytes=int(os.getenv("AGNI_MAX_BODY_BYTES", 2_000_000)),
+            capture=CaptureConfig.from_env(),
         )
         s.validate()
         return s

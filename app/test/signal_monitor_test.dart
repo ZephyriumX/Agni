@@ -5,13 +5,21 @@ import 'package:agni_pulse/signal_monitor.dart';
 void main() {
   test('finger detection needs sustained red-dominant frames (hysteresis)', () {
     final m = SignalMonitor();
-    for (var i = 0; i < 5; i++) { m.add(i / 60, 200, 60, 20, 0, 0); }
+    for (var i = 0; i < 5; i++) {
+      m.add(i / 60, 200, 60, 20, 0, 0);
+    }
     expect(m.finger, isFalse);
-    for (var i = 5; i < 30; i++) { m.add(i / 60, 200, 60, 20, 0, 0); }
+    for (var i = 5; i < 30; i++) {
+      m.add(i / 60, 200, 60, 20, 0, 0);
+    }
     expect(m.finger, isTrue);
-    for (var i = 30; i < 40; i++) { m.add(i / 60, 30, 30, 30, 0, 0.9); }
+    for (var i = 30; i < 40; i++) {
+      m.add(i / 60, 30, 30, 30, 0, 0.9);
+    }
     expect(m.finger, isTrue); // brief glitch tolerated
-    for (var i = 40; i < 80; i++) { m.add(i / 60, 30, 30, 30, 0, 0.9); }
+    for (var i = 40; i < 80; i++) {
+      m.add(i / 60, 30, 30, 30, 0, 0.9);
+    }
     expect(m.finger, isFalse);
   });
 

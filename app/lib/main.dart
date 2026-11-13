@@ -15,7 +15,8 @@ class AgniPulseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
         title: 'Agni-Pulse',
-        theme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
+        theme:
+            ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
         home: const HomeScreen(),
       );
 }
@@ -67,9 +68,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _go(Widget w) async {
-    final r = await Navigator.push<Object?>(context, MaterialPageRoute<Object?>(builder: (_) => w));
+    final r = await Navigator.push<Object?>(
+        context, MaterialPageRoute<Object?>(builder: (_) => w));
     if (r is Map && r['vajrasana_for'] != null && mounted) {
-      await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => TimerScreen(preScanId: r['vajrasana_for'] as String)));
+      await Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+              builder: (_) =>
+                  TimerScreen(preScanId: r['vajrasana_for'] as String)));
     }
     _refresh();
   }
@@ -78,10 +84,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Agni-Pulse'), actions: [
-        IconButton(icon: const Icon(Icons.settings), onPressed: () => _go(const SettingsScreen())),
+        IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => _go(const SettingsScreen())),
       ]),
       body: ListView(padding: const EdgeInsets.all(24), children: [
-        const Text('Vascular & autonomic check using your phone camera.', style: TextStyle(fontSize: 16)),
+        const Text('Vascular & autonomic check using your phone camera.',
+            style: TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         ActionChip(
           avatar: Icon(Icons.circle, size: 12, color: _serverColor),
@@ -100,20 +109,34 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         const SizedBox(height: 16),
         if (_prakriti == null)
-          OutlinedButton.icon(icon: const Icon(Icons.spa), label: const Text('Prakriti quiz (1 min)'), onPressed: () => _go(const QuizScreen()))
+          OutlinedButton.icon(
+              icon: const Icon(Icons.spa),
+              label: const Text('Prakriti quiz (1 min)'),
+              onPressed: () => _go(const QuizScreen()))
         else
           Text('Prakriti: $_prakriti'),
         const SizedBox(height: 12),
-        FilledButton.icon(icon: const Icon(Icons.favorite), label: const Text('New scan'), onPressed: () => _go(const ScanScreen())),
+        FilledButton.icon(
+            icon: const Icon(Icons.favorite),
+            label: const Text('New scan'),
+            onPressed: () => _go(const ScanScreen())),
         const SizedBox(height: 12),
-        OutlinedButton.icon(icon: const Icon(Icons.insights), label: const Text('Metabolic report'), onPressed: () => _go(const ReportScreen())),
+        OutlinedButton.icon(
+            icon: const Icon(Icons.insights),
+            label: const Text('Metabolic report'),
+            onPressed: () => _go(const ReportScreen())),
         const SizedBox(height: 12),
-        OutlinedButton.icon(icon: const Icon(Icons.restaurant), label: const Text('Food diary'), onPressed: () => _go(const DiaryScreen())),
+        OutlinedButton.icon(
+            icon: const Icon(Icons.restaurant),
+            label: const Text('Food diary'),
+            onPressed: () => _go(const DiaryScreen())),
         const SizedBox(height: 24),
-        const Text('Tip: record a Baseline first (rested, seated). Then scan 30 min after a meal, and again after 10 min of Vajrasana.',
+        const Text(
+            'Tip: record a Baseline first (rested, seated). Then scan 30 min after a meal, and again after 10 min of Vajrasana.',
             style: TextStyle(color: Colors.grey)),
         const SizedBox(height: 8),
-        const Text('Wellness tool, not a medical device.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+        const Text('Wellness tool, not a medical device.',
+            style: TextStyle(color: Colors.grey, fontSize: 12)),
       ]),
     );
   }

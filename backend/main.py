@@ -123,7 +123,7 @@ class BodyLimit:
 def create_app(settings: Optional[Settings] = None, store=None) -> FastAPI:
     settings = settings or Settings.load()
     store = store or make_store(settings)
-    app = FastAPI(title="Agni-Pulse API", version="0.3.0", description=DISCLAIMER)
+    app = FastAPI(title="Agni-Pulse API", version="0.4.0", description=DISCLAIMER)
     app.state.settings, app.state.store = settings, store
     current_user = auth.make_current_user(settings, lambda: store)
     reg_limiter = auth.RateLimiter(settings.register_per_hour, 3600)
@@ -156,6 +156,12 @@ def create_app(settings: Optional[Settings] = None, store=None) -> FastAPI:
     def health():
         return {"ok": True, "version": app.version, "env": settings.env, "storage": settings.storage,
                 "auth_mode": settings.auth_mode}
+
+    @app.get("/api/v1/capture-config")
+    def capture_config():
+        """FPS / timing thresholds the server applies (engineering parameters, not clinical limits).
+        Public and secret-free so the app can show the same numbers it will be judged by."""
+        return settings.capture.public()
 
     @app.get("/ready")
     def ready():
@@ -212,7 +218,12 @@ def create_app(settings: Optional[Settings] = None, store=None) -> FastAPI:
             raise HTTPException(404, "meal not found")
         t0 = time.perf_counter()
         try:
-            m = dsp.process_scan(req.red, req.fs, req.green, req.invert, req.timestamps)
+            m = dsp.process_scan(req.red, req.fs, req.green, req.invert, req.timestamps,
+                                 capture_cfg=settings.capture)
+        except dsp.CaptureRejected as e:
+            # same status/code as before; the report is additive so the app can show diagnostics
+            return JSONResponse({"detail": str(e), "code": "signal_rejected", "capture_status": dsp.FAIL,
+                                 "acquisition": e.report}, 422)
         except dsp.SignalError as e:
             return JSONResponse({"detail": str(e), "code": "signal_rejected"}, 422)
         proc_ms = (time.perf_counter() - t0) * 1000
@@ -253,6 +264,8 @@ def create_app(settings: Optional[Settings] = None, store=None) -> FastAPI:
             "rmssd_ms": _r(m.rmssd_ms, 1), "avg_bpm": _r(m.avg_bpm, 1), "channel": m.channel,
             "sqi": {k: (_r(v, 3) if isinstance(v, float) else v) for k, v in s.__dict__.items()},
             "acquisition": m.acquisition, "warnings": m.warnings, "processing_ms": round(proc_ms, 1),
+            "capture_status": (m.acquisition or {}).get("status"),
+            "final_status": dsp.combine_status((m.acquisition or {}).get("status"), s.passed),
             "template": m.template, "comparison": comparison, "disclaimer": DISCLAIMER}
 
     @app.get("/api/v1/scans/{scan_id}")

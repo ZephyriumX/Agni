@@ -24,14 +24,18 @@ from typing import Optional
 import numpy as np
 from scipy import signal as sps
 
+from capture_validation import (DEFAULT_CAPTURE_CONFIG, FAIL, PASS, WARNING, CaptureConfig,  # noqa: F401
+                                CaptureRejected, SignalError, combine_status, evaluate_timestamps,
+                                reject_message, resample_uniform)
+
 # --------------------------------------------------------------------------- config
 F_LOW_HZ = 0.5
 F_HIGH_HZ = 5.0
 FILTER_ORDER = 4          # design order per PRD; sosfiltfilt makes it zero-phase
-MIN_FS_HZ = 60.0          # PRD F1: 60 fps+. Never lowered silently; see acquisition_check()
-ALGO_VERSION = "0.3.0"
-MAX_DROP_FRACTION = 0.05  # >5% dropped frames => reject acquisition
-MAX_GAP_S = 0.15          # any single gap > 150 ms => reject (finger/camera stall)
+# Frame-rate / timing policy now lives in capture_validation.CaptureConfig (configurable, documented).
+# Kept for backward compatibility: the hard minimum used when only a nominal fs (no timestamps) is given.
+MIN_FS_HZ = DEFAULT_CAPTURE_CONFIG.hard_min_fps
+ALGO_VERSION = "0.4.0"
 MIN_DURATION_S = 15.0
 RECOMMENDED_DURATION_S = 30.0   # ultra-short HRV is unreliable below ~30 s
 SETTLE_TRIM_S = 2.0       # drop finger-placement / filter transient at the start
@@ -46,10 +50,6 @@ SQI_MAX_PI_PCT = 40.0     # above => saturation / pressure artifact
 SQI_MIN_SNR_DB = 3.0
 SQI_MIN_TEMPLATE_CORR = 0.75
 SQI_MAX_ARTIFACT_FRAC = 0.05
-
-
-class SignalError(ValueError):
-    """Input cannot be processed at all (bad fs, too short, NaNs...)."""
 
 
 # --------------------------------------------------------------------------- results
@@ -378,71 +378,56 @@ def _analyse_channel(raw: np.ndarray, fs: float, invert: bool, name: str) -> Sca
                        template=feats["template"])
 
 
-def acquisition_check(t: np.ndarray, min_fs: float = MIN_FS_HZ) -> dict:
+def acquisition_check(t: np.ndarray, min_fs: Optional[float] = None,
+                      cfg: Optional[CaptureConfig] = None) -> dict:
     """Validate REAL sample timing (sensor timestamps in seconds). Never fabricates a rate.
 
-    Returns the measured effective fs, drop fraction and largest gap, or raises SignalError with
-    an actionable explanation when the capture cannot support PPG/APG analysis.
+    Returns the acquisition report (status PASS or WARNING) or raises CaptureRejected (a SignalError)
+    when the timing is FAIL. `min_fs`, if given, overrides the configured hard minimum fps.
     """
-    t = np.asarray(t, dtype=float)
-    if t.ndim != 1 or len(t) < 10 or not np.all(np.isfinite(t)):
-        raise SignalError("timestamps missing or invalid")
-    dt = np.diff(t)
-    if np.any(dt <= 0):
-        raise SignalError("timestamps are not strictly increasing (duplicate/out-of-order frames)")
-    med = float(np.median(dt))
-    fs_eff = 1.0 / med                      # median interval: robust to a few drops
-    fs_mean = (len(t) - 1) / (t[-1] - t[0])
-    expected = (t[-1] - t[0]) / med + 1
-    drop = max(0.0, 1.0 - len(t) / expected)
-    gap = float(dt.max())
-    rep = {"fs_median": round(float(fs_eff), 2), "fs_mean": round(float(fs_mean), 2),
-           "drop_fraction": round(float(drop), 4), "max_gap_s": round(gap, 4),
-           "n_samples": int(len(t)), "duration_s": round(float(t[-1] - t[0]), 2)}
-    if drop > MAX_DROP_FRACTION or gap > MAX_GAP_S:
-        raise SignalError(
-            f"too many dropped frames ({drop:.0%}, longest gap {gap * 1000:.0f} ms). "
-            "Close other apps, keep the phone cool, and rescan.")
-    if fs_eff < min_fs - 0.5 or fs_mean < min_fs - 0.5:
-        raise SignalError(
-            f"camera delivered {fs_mean:.1f} fps (< {min_fs:.0f} fps required). The recording was NOT "
-            "analysed; relabelling a slower stream as 60 fps would corrupt the derivatives.")
+    cfg = cfg or DEFAULT_CAPTURE_CONFIG
+    if min_fs is not None:
+        from dataclasses import replace
+        cfg = replace(cfg, hard_min_fps=float(min_fs), preferred_min_fps=max(float(min_fs), cfg.preferred_min_fps),
+                      target_fps=max(float(min_fs), cfg.target_fps)).validate()
+    rep = evaluate_timestamps(t, cfg)
+    if rep["status"] == FAIL:
+        raise CaptureRejected(reject_message(rep), rep)
     return rep
-
-
-def resample_uniform(t: np.ndarray, x: np.ndarray, fs: float) -> np.ndarray:
-    """Linear resample of nearly-uniform samples to an exactly uniform grid.
-
-    Justified only after acquisition_check() (jitter around a >=60 fps clock, no large gaps):
-    linear interpolation of sub-frame timing jitter has negligible effect in the 0.5-5 Hz band.
-    """
-    t = np.asarray(t, dtype=float)
-    grid = np.arange(t[0], t[-1], 1.0 / fs)
-    return np.interp(grid, t, np.asarray(x, dtype=float))
 
 
 def process_scan(red: list[float] | np.ndarray, fs: Optional[float] = None,
                  green: Optional[list[float] | np.ndarray] = None,
-                 invert: bool = True, timestamps: Optional[list[float]] = None) -> ScanMetrics:
-    """Full pipeline. Analyses red (and green if given) and returns the better-quality result."""
+                 invert: bool = True, timestamps: Optional[list[float]] = None,
+                 capture_cfg: Optional[CaptureConfig] = None) -> ScanMetrics:
+    """Full pipeline. Analyses red (and green if given) and returns the better-quality result.
+
+    With `timestamps` (preferred): timing is judged by evaluate_timestamps(); the signal is linearly
+    resampled to a uniform grid at the MEASURED mean rate (never relabelled as 60 Hz) and every filter,
+    derivative and window then uses that true rate. The caller keeps the original timestamps.
+    Timing and SQI are separate gates: this function never lets good timing rescue a failed SQI.
+    """
+    cfg = capture_cfg or DEFAULT_CAPTURE_CONFIG
     acq = None
     red = np.asarray(red, dtype=float)
     if timestamps is not None:
         t = np.asarray(timestamps, dtype=float)
         if len(t) != len(red):
             raise SignalError("timestamps and red must be the same length")
-        acq = acquisition_check(t)
-        fs = float(np.floor(acq["fs_mean"]))
+        if green is not None and len(green) != len(t):
+            raise SignalError("red and green arrays must be the same length")
+        acq = acquisition_check(t, cfg=cfg)
+        fs = float(acq["effective_fs"])
         red = resample_uniform(t, red, fs)
         if green is not None:
-            if len(green) != len(t):
-                raise SignalError("red and green arrays must be the same length")
             green = resample_uniform(t, green, fs)
+        acq = {**acq, "resampled": True, "resample_method": "linear", "resampled_to_hz": round(fs, 3),
+               "n_resampled": int(len(red))}
     else:
         if fs is None:
             raise SignalError("either timestamps or fs is required")
-        if fs < MIN_FS_HZ:
-            raise SignalError(f"sampling rate {fs} Hz below required {MIN_FS_HZ} Hz")
+        if not np.isfinite(fs) or fs < cfg.hard_min_fps:
+            raise SignalError(f"sampling rate {fs} Hz below the {cfg.hard_min_fps:g} Hz minimum")
     results = [_analyse_channel(red, fs, invert, "red")]
     if green is not None:
         green = np.asarray(green, dtype=float)
@@ -456,6 +441,10 @@ def process_scan(red: list[float] | np.ndarray, fs: Optional[float] = None,
                 if np.isfinite(s.template_correlation) else -1)
     best = max(results, key=score)
     best.acquisition = acq
+    if acq is None:
+        best.warnings.append(f"sampling rate {fs:g} Hz is nominal: frame timing was not verified (no timestamps)")
+    else:
+        best.warnings += [r["message"] for r in acq["reasons"]]
     return best
 
 
