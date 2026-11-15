@@ -19,13 +19,8 @@ List<double> build(Map<String, dynamic> spec) {
     t0 += n / fps;
   }
   for (final d in (spec['delete'] as List? ?? const [])) {
-    final drop = <int>{
-      for (var i = d[0] as int; i < (d[1] as int); i += d[2] as int) i
-    };
-    t = [
-      for (var i = 0; i < t.length; i++)
-        if (!drop.contains(i)) t[i]
-    ];
+    final drop = <int>{for (var i = d[0] as int; i < (d[1] as int); i += d[2] as int) i};
+    t = [for (var i = 0; i < t.length; i++) if (!drop.contains(i)) t[i]];
   }
   return t;
 }
@@ -34,36 +29,29 @@ List<double> uniform(double fps, [double dur = 35]) =>
     [for (var i = 0; i * (1 / fps) < dur; i++) i / fps];
 
 void main() {
-  test('Dart validator agrees with the Python validator on every golden vector',
-      () {
+  test('Dart validator agrees with the Python validator on every golden vector', () {
     // `flutter test` runs with cwd = app/
     final f = File('../docs/capture_validation_vectors.json');
-    expect(f.existsSync(), isTrue,
-        reason: 'run flutter test from the app/ directory');
+    expect(f.existsSync(), isTrue, reason: 'run flutter test from the app/ directory');
     final doc = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
     final vectors = doc['vectors'] as List;
     expect(vectors, isNotEmpty);
     for (final v in vectors) {
       final r = evaluateTimestamps(build(v as Map<String, dynamic>));
       final exp = v['expect'] as Map<String, dynamic>;
-      expect(statusLabel(r.status), exp['status'],
-          reason: '${v['name']}: ${r.messages}');
-      expect(r.codes.toList()..sort(), (exp['codes'] as List).cast<String>(),
-          reason: v['name'] as String);
+      expect(statusLabel(r.status), exp['status'], reason: '${v['name']}: ${r.messages}');
+      expect(r.codes.toList()..sort(), (exp['codes'] as List).cast<String>(), reason: v['name'] as String);
     }
   });
 
   test('invalid, non-finite and non-monotonic timestamps fail', () {
     expect(evaluateTimestamps([]).status, CaptureStatus.fail);
-    expect(evaluateTimestamps(List.filled(30, double.nan)).codes,
-        contains('timestamps_invalid'));
+    expect(evaluateTimestamps(List.filled(30, double.nan)).codes, contains('timestamps_invalid'));
     final t = uniform(60);
     final dup = [...t.sublist(0, 50), ...t.sublist(49)];
     expect(evaluateTimestamps(dup).codes, contains('timestamps_not_monotonic'));
-    expect(evaluateTimestamps([for (final x in uniform(60)) x * 1000]).status,
-        CaptureStatus.fail);
-    expect(evaluateTimestamps([for (final x in uniform(60)) x / 1000]).codes,
-        contains('timestamps_implausible'));
+    expect(evaluateTimestamps([for (final x in uniform(60)) x * 1000]).status, CaptureStatus.fail);
+    expect(evaluateTimestamps([for (final x in uniform(60)) x / 1000]).codes, contains('timestamps_implausible'));
   });
 
   test('config parsing, defaults and native fps hand-off', () {
@@ -72,8 +60,7 @@ void main() {
     expect(c.targetFps, 60);
     expect(CaptureConfig.defaults.nativeMinFps, 55);
     expect(CaptureConfig.defaults.nativeTargetFps, 60);
-    final strict =
-        CaptureConfig.fromJson({'hard_min_fps': 59, 'preferred_min_fps': 59.5});
+    final strict = CaptureConfig.fromJson({'hard_min_fps': 59, 'preferred_min_fps': 59.5});
     expect(evaluateTimestamps(uniform(58), strict).status, CaptureStatus.fail);
   });
 

@@ -95,14 +95,22 @@ class _QuizScreenState extends State<QuizScreen> {
         for (var i = 0; i < _qs.length; i++) ...[
           Text(_qs[i].title,
               style: const TextStyle(fontWeight: FontWeight.bold)),
-          for (final o in _qs[i].opts)
-            RadioListTile<String>(
-              dense: true,
-              title: Text(o[0]),
-              value: o[1],
-              groupValue: _ans[i],
-              onChanged: (v) => setState(() => _ans[i] = v!),
+          RadioGroup<String>(
+            groupValue: _ans[i],
+            onChanged: (value) {
+              if (value != null) setState(() => _ans[i] = value);
+            },
+            child: Column(
+              children: [
+                for (final o in _qs[i].opts)
+                  RadioListTile<String>(
+                    dense: true,
+                    title: Text(o[0]),
+                    value: o[1],
+                  ),
+              ],
             ),
+          ),
           const SizedBox(height: 8),
         ],
         if (_msg != null)
