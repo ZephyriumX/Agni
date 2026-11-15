@@ -1,8 +1,36 @@
-__pycache__/
-.pytest_cache/
-.venv/
+
+# Environment variables and secrets
 .env
-*.pyc
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Flutter and Dart
 .dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
 build/
+**/build/
+.flutter_build/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
 *.rejected

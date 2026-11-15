@@ -1,10 +1,11 @@
 name: agni_pulse
 description: Agni-Pulse - smartphone PPG/APG vascular health analyzer
 publish_to: "none"
-version: 0.3.0+3
+version: 0.4.0+4
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"   # ColorScheme.surfaceContainerHighest
 
 dependencies:
   flutter:

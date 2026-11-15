@@ -44,17 +44,19 @@ class PpgCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventCha
         when (call.method) {
             "capabilities" -> try {
                 val tf = call.argument<Int>("targetFps") ?: 60
-                result.success(CameraCaps.query(ctx, tf, call.argument<Int>("minFps") ?: tf))
+                result.success(CameraCaps.query(ctx, tf, call.argument<Int>("minFps") ?: tf, call.argument<String>("cameraKey")))
             } catch (e: Exception) {
                 result.error("CAPS_FAILED", e.message, null)
             }
+            "requestPermission" ->
+                result.success(ctx.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
             "start" -> {
                 if (ctx.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                     result.error("NO_PERMISSION", "Camera permission not granted", null); return
                 }
                 session?.stop()
                 val fps = call.argument<Int>("targetFps") ?: 60
-                val s = PpgSession(ctx, fps, call.argument<Int>("minFps") ?: fps) { batch -> main.post { sink?.success(batch) } }
+                val s = PpgSession(ctx, fps, call.argument<Int>("minFps") ?: fps, call.argument<String>("cameraKey")) { batch -> main.post { sink?.success(batch) } }
                 session = s
                 s.start({ info -> main.post { result.success(info) } },
                         { code, msg -> main.post { session = null; result.error(code, msg, null) } })

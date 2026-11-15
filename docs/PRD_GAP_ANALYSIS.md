@@ -59,3 +59,10 @@ PostgreSQL 16 cluster). **Unverified** = written but never compiled/run (no Flut
 The app will say so with Camera2 evidence and refuse to scan. A scientifically defensible fallback (not implemented, would
 need your decision): ≥30 fps with sub-sample peak interpolation is commonly used for pulse-rate variability (RMSSD) but is
 **not** adequate for the second derivative (APG, b/a). That would mean an HRV-only mode with b/a disabled.
+
+## Addendum (v0.4.0)
+* F1 is now split: capture **timing** is PASS/WARNING/FAIL from real timestamps (`docs/CAPTURE_VALIDATION.md`); the Android
+  plugin lists and lets the user choose among all back cameras including physical lenses (`docs/CAMERA_SELECTION.md`);
+  an **iOS** plugin exists but is uncompiled. See `docs/STATUS.md` for the per-component verification state.
+* The v0.3 statement "hard 60 fps gate" is superseded: minimum 55 fps (configurable), preferred 58+, with drops, gaps,
+  variability and fps fluctuation judged together. SQI thresholds are unchanged.

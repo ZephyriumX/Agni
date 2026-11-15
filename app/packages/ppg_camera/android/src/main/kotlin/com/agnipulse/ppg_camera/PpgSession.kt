@@ -4,8 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.ImageFormat
 import android.hardware.camera2.*
+import android.hardware.camera2.params.OutputConfiguration
+import android.hardware.camera2.params.SessionConfiguration
 import android.media.Image
 import android.media.ImageReader
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import kotlin.math.max
@@ -26,6 +29,7 @@ class PpgSession(
     private val ctx: Context,
     private val targetFps: Int,
     private val minFps: Int = targetFps,
+    private val cameraKey: String? = null,   // null = automatic choice; otherwise the user's selected lens
     private val emit: (Map<String, Any?>) -> Unit,
 ) {
     private val thread = HandlerThread("ppg-camera").also { it.start() }
@@ -54,14 +58,24 @@ class PpgSession(
     @SuppressLint("MissingPermission")
     fun start(onOk: (Map<String, Any?>) -> Unit, onErr: (String, String) -> Unit) {
         val mgr = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val pick = CameraCaps.pick(ctx, targetFps, minFps)
+        val listing = CameraCaps.enumerate(ctx)
+        val pick = CameraCaps.choose(listing.cams, targetFps, minFps, cameraKey)
         if (pick == null) {
-            onErr("FPS_UNSUPPORTED", "No back camera with flash can stream YUV at >= $minFps fps on this device")
+            val sel = cameraKey?.let { k -> listing.cams.firstOrNull { it.key == k } }
+            if (cameraKey != null) {
+                onErr("CAMERA_UNSUITABLE", if (sel == null)
+                    "The selected camera ($cameraKey) is not available on this phone any more. Choose another camera or Automatic."
+                else "${sel.label}: ${CameraCaps.reason(sel, minFps)}. Choose another camera or Automatic.")
+            } else {
+                onErr("FPS_UNSUPPORTED", "No back camera with flash can stream YUV at >= $minFps fps to apps on this device")
+            }
             return
         }
         // Ask for what the stream can really do: never a shorter frame duration than its hardware minimum.
         frameNs = max(frameNs, (1e9 / pick.maxFps).toLong())
-        val ch = mgr.getCameraCharacteristics(pick.id)
+        // characteristics of the lens that actually produces the frames (physical lens if one was selected)
+        val ch = try { mgr.getCameraCharacteristics(pick.cam.physicalId ?: pick.cam.logicalId) }
+                 catch (_: Exception) { mgr.getCameraCharacteristics(pick.cam.logicalId) }
         manual = pick.manual
         ch.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)?.let { isoMin = it.lower; isoMax = min(it.upper, 1600) }
         ch.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)?.let {
@@ -73,7 +87,7 @@ class PpgSession(
             it.setOnImageAvailableListener({ r -> onImage(r) }, bg)
         }
         try {
-            mgr.openCamera(pick.id, object : CameraDevice.StateCallback() {
+            mgr.openCamera(pick.cam.logicalId, object : CameraDevice.StateCallback() {
                 override fun onOpened(cd: CameraDevice) {
                     device = cd
                     try { createSession(cd, ch, pick, onOk, onErr) } catch (e: Exception) { onErr("SESSION_FAILED", e.message ?: "") }
@@ -114,7 +128,7 @@ class PpgSession(
                 b.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, it.lower)
             }
         }
-        cd.createCaptureSession(listOf(reader!!.surface), object : CameraCaptureSession.StateCallback() {
+        val stateCb = object : CameraCaptureSession.StateCallback() {
             override fun onConfigured(s: CameraCaptureSession) {
                 if (closed) { s.close(); return }
                 captureSession = s
@@ -125,12 +139,27 @@ class PpgSession(
                         result.get(CaptureResult.SENSOR_FRAME_DURATION)?.let { lastFrameNs = it }
                     }
                 }, bg)
-                onOk(mapOf("cameraId" to pick.id, "width" to pick.width, "height" to pick.height,
+                onOk(mapOf("cameraId" to pick.cam.key, "cameraKey" to pick.cam.key, "cameraLabel" to pick.cam.label,
+                    "logicalId" to pick.cam.logicalId, "physicalId" to pick.cam.physicalId,
+                    "flash" to pick.cam.hasFlash, "width" to pick.width, "height" to pick.height,
                     "streamMaxFps" to pick.maxFps, "manualExposure" to manual, "targetFps" to targetFps,
                     "minFps" to minFps, "platform" to "android"))
             }
-            override fun onConfigureFailed(s: CameraCaptureSession) { onErr("SESSION_FAILED", "configure failed") }
-        }, bg)
+            override fun onConfigureFailed(s: CameraCaptureSession) {
+                onErr("SESSION_FAILED", "configure failed for ${pick.cam.label}" +
+                    (if (pick.cam.physicalId != null) " (physical lens; try Automatic or another camera)" else ""))
+            }
+        }
+        // A physical lens behind a logical camera is addressed through the OutputConfiguration (API 28+).
+        val pid = pick.cam.physicalId
+        if (pid != null && Build.VERSION.SDK_INT >= 28) {
+            val oc = OutputConfiguration(reader!!.surface)
+            oc.setPhysicalCameraId(pid)
+            cd.createCaptureSession(SessionConfiguration(SessionConfiguration.SESSION_REGULAR, listOf(oc),
+                { r -> bg.post(r) }, stateCb))
+        } else {
+            cd.createCaptureSession(listOf(reader!!.surface), stateCb, bg)
+        }
     }
 
     private fun applyManual(b: CaptureRequest.Builder) {
