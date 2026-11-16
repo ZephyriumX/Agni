@@ -53,6 +53,10 @@ class AppConfig {
     }
   }
 
+  /// First-run disclaimer/consent accepted?
+  static Future<bool> onboarded() async => (await SharedPreferences.getInstance()).getBool('onboarded') == true;
+  static Future<void> setOnboarded() async => (await SharedPreferences.getInstance()).setBool('onboarded', true);
+
   static Future<String> registrationKey() async => (await _secure.read(key: 'regKey')) ?? '';
   static Future<void> setRegistrationKey(String v) => _secure.write(key: 'regKey', value: v.trim());
 

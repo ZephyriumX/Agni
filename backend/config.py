@@ -22,7 +22,7 @@ class Settings:
     supabase_jwt_secret: str = ""
     cors_origins: list = field(default_factory=list)
     max_body_bytes: int = 2_000_000          # ~35 s @ 60 Hz x3 channels is ~150 kB
-    max_samples: int = 60 * 130              # 130 s @ 60 fps hard cap
+    max_samples: int = 120 * 130             # 130 s @ 120 fps hard cap (high-speed capture path)
     register_per_hour: int = 30
     capture: CaptureConfig = DEFAULT_CAPTURE_CONFIG   # FPS/timing policy; AGNI_CAPTURE_* env overrides
 

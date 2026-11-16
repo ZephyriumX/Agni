@@ -1,7 +1,7 @@
 name: agni_pulse
 description: Agni-Pulse - smartphone PPG/APG vascular health analyzer
 publish_to: "none"
-version: 0.4.0+4
+version: 0.5.0+5
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

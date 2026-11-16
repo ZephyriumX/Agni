@@ -1,0 +1,333 @@
+{
+ "note": "Golden vectors for capture timing validation. Regenerate with: python -m tests.vectors",
+ "config": "defaults",
+ "vectors": [
+  {
+   "name": "exact_60",
+   "segments": [
+    [
+     35,
+     60
+    ]
+   ],
+   "expect": {
+    "status": "PASS",
+    "codes": []
+   }
+  },
+  {
+   "name": "stable_58",
+   "segments": [
+    [
+     35,
+     58
+    ]
+   ],
+   "expect": {
+    "status": "PASS",
+    "codes": []
+   }
+  },
+  {
+   "name": "stable_57",
+   "segments": [
+    [
+     35,
+     57
+    ]
+   ],
+   "expect": {
+    "status": "WARNING",
+    "codes": [
+     "fps_below_preferred"
+    ]
+   }
+  },
+  {
+   "name": "stable_55",
+   "segments": [
+    [
+     35,
+     55
+    ]
+   ],
+   "expect": {
+    "status": "WARNING",
+    "codes": [
+     "fps_below_preferred"
+    ]
+   }
+  },
+  {
+   "name": "stable_54",
+   "segments": [
+    [
+     35,
+     54
+    ]
+   ],
+   "expect": {
+    "status": "FAIL",
+    "codes": [
+     "fps_fluctuates",
+     "fps_too_low"
+    ]
+   }
+  },
+  {
+   "name": "stable_30",
+   "segments": [
+    [
+     35,
+     30
+    ]
+   ],
+   "expect": {
+    "status": "FAIL",
+    "codes": [
+     "fps_fluctuates",
+     "fps_too_low"
+    ]
+   }
+  },
+  {
+   "name": "wander_50_60",
+   "segments": [
+    [
+     7,
+     60
+    ],
+    [
+     7,
+     50
+    ],
+    [
+     7,
+     58
+    ],
+    [
+     7,
+     52
+    ],
+    [
+     7,
+     60
+    ]
+   ],
+   "expect": {
+    "status": "FAIL",
+    "codes": [
+     "fps_below_preferred",
+     "fps_fluctuates"
+    ]
+   }
+  },
+  {
+   "name": "long_slow_stretch",
+   "segments": [
+    [
+     20,
+     60
+    ],
+    [
+     15,
+     50
+    ]
+   ],
+   "expect": {
+    "status": "FAIL",
+    "codes": [
+     "fps_below_preferred",
+     "fps_fluctuates"
+    ]
+   }
+  },
+  {
+   "name": "mild_fluctuation",
+   "segments": [
+    [
+     9,
+     60
+    ],
+    [
+     9,
+     57
+    ],
+    [
+     9,
+     59
+    ],
+    [
+     8,
+     56
+    ]
+   ],
+   "expect": {
+    "status": "PASS",
+    "codes": []
+   }
+  },
+  {
+   "name": "drops_1pct",
+   "segments": [
+    [
+     35,
+     60
+    ]
+   ],
+   "delete": [
+    [
+     100,
+     2000,
+     100
+    ]
+   ],
+   "expect": {
+    "status": "PASS",
+    "codes": []
+   }
+  },
+  {
+   "name": "drops_4pct",
+   "segments": [
+    [
+     35,
+     60
+    ]
+   ],
+   "delete": [
+    [
+     100,
+     2000,
+     25
+    ]
+   ],
+   "expect": {
+    "status": "WARNING",
+    "codes": [
+     "some_drops"
+    ]
+   }
+  },
+  {
+   "name": "drops_8pct",
+   "segments": [
+    [
+     35,
+     60
+    ]
+   ],
+   "delete": [
+    [
+     100,
+     2000,
+     12
+    ]
+   ],
+   "expect": {
+    "status": "FAIL",
+    "codes": [
+     "fps_below_preferred",
+     "too_many_drops"
+    ]
+   }
+  },
+  {
+   "name": "gap_120ms",
+   "segments": [
+    [
+     35,
+     60
+    ]
+   ],
+   "delete": [
+    [
+     500,
+     507,
+     1
+    ]
+   ],
+   "expect": {
+    "status": "WARNING",
+    "codes": [
+     "gap"
+    ]
+   }
+  },
+  {
+   "name": "gap_350ms",
+   "segments": [
+    [
+     35,
+     60
+    ]
+   ],
+   "delete": [
+    [
+     500,
+     520,
+     1
+    ]
+   ],
+   "expect": {
+    "status": "FAIL",
+    "codes": [
+     "fps_dips",
+     "long_gap"
+    ]
+   }
+  },
+  {
+   "name": "short_10s",
+   "segments": [
+    [
+     10,
+     60
+    ]
+   ],
+   "expect": {
+    "status": "FAIL",
+    "codes": [
+     "too_short"
+    ]
+   }
+  },
+  {
+   "name": "short_20s",
+   "segments": [
+    [
+     20,
+     60
+    ]
+   ],
+   "expect": {
+    "status": "WARNING",
+    "codes": [
+     "short"
+    ]
+   }
+  },
+  {
+   "name": "58_with_gap_120ms",
+   "segments": [
+    [
+     35,
+     58
+    ]
+   ],
+   "delete": [
+    [
+     500,
+     507,
+     1
+    ]
+   ],
+   "expect": {
+    "status": "WARNING",
+    "codes": [
+     "gap"
+    ]
+   }
+  }
+ ]
+}

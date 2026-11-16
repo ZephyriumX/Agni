@@ -25,6 +25,9 @@ import kotlin.math.roundToInt
 object CameraCaps {
     data class Sz(val w: Int, val h: Int, val fps: Double)
 
+    /** One constrained high-speed mode: a fixed/variable fps range and the video size it is offered at. */
+    data class Hs(val lo: Int, val hi: Int, val w: Int, val h: Int)
+
     data class Cam(
         val key: String,
         val logicalId: String,
@@ -40,12 +43,17 @@ object CameraCaps {
         val focalMm: Double?,
         val equivMm: Double?,             // 35 mm-equivalent focal length, a hint for ultra-wide / main / tele
         val physicalIds: List<String>,    // for logical cameras: the lenses behind it
+        val hs: List<Hs> = emptyList(),   // constrained high-speed modes (only for cameras without a physical routing)
     ) {
         val maxFps: Double get() = yuv.maxOfOrNull { it.fps } ?: 0.0
+        val maxHsFps: Int get() = hs.maxOfOrNull { it.hi } ?: 0
         var label: String = key
     }
 
-    data class Pick(val cam: Cam, val width: Int, val height: Int, val maxFps: Double) {
+    /** mode "yuv": ImageReader stream. mode "highspeed": constrained high-speed session on a SurfaceTexture;
+     *  [hsCandidates] is the ordered list of modes to try (first = preferred). */
+    data class Pick(val cam: Cam, val width: Int, val height: Int, val maxFps: Double,
+                    val mode: String = "yuv", val hsCandidates: List<Hs> = emptyList()) {
         val manual: Boolean get() = cam.manual
         val id: String get() = cam.logicalId
     }
@@ -73,6 +81,20 @@ object CameraCaps {
             ?.map { listOf(it.lower, it.upper) } ?: emptyList()
     } catch (_: Exception) { emptyList() }
 
+    /** Per high-speed range, the smallest size that is at least 320 px wide (else the smallest offered). */
+    private fun highSpeedModes(ch: CameraCharacteristics): List<Hs> {
+        if (Build.VERSION.SDK_INT < 23) return emptyList()
+        return try {
+            val map = ch.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: return emptyList()
+            map.highSpeedVideoFpsRanges.mapNotNull { r ->
+                val sizes = try { map.getHighSpeedVideoSizesFor(r).toList() } catch (_: Exception) { emptyList() }
+                val s = sizes.filter { it.width >= 320 }.minByOrNull { it.width * it.height }
+                    ?: sizes.minByOrNull { it.width * it.height } ?: return@mapNotNull null
+                Hs(r.lower, r.upper, s.width, s.height)
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
     fun hasManual(ch: CameraCharacteristics): Boolean =
         ch.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
             ?.contains(CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR) == true
@@ -95,7 +117,8 @@ object CameraCaps {
             aeRanges = ch.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
                 ?.map { listOf(it.lower, it.upper) } ?: emptyList(),
             hardwareLevel = ch.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL),
-            focalMm = focal, equivMm = equiv, physicalIds = physIds)
+            focalMm = focal, equivMm = equiv, physicalIds = physIds,
+            hs = if (physicalId == null) highSpeedModes(ch) else emptyList())
     }
 
     private fun lensName(eq: Double?): String = when {
@@ -141,17 +164,30 @@ object CameraCaps {
         return Listing(out, hidden)
     }
 
-    /** Smallest YUV size (>= 160 px wide) that reaches minFps on this camera, or null. Flash is required. */
+    /** High-speed candidates whose LOWER bound already meets minFps (so the sensor never drops below it),
+     *  ordered by lowest upper bound, then fixed ranges first. */
+    fun hsCandidates(c: Cam, minFps: Int): List<Hs> =
+        c.hs.filter { it.lo >= minFps }.sortedWith(compareBy({ it.hi }, { it.lo != it.hi }))
+
+    /**
+     * How this camera can reach minFps: a regular YUV stream if one is fast enough (smallest such size),
+     * otherwise a constrained high-speed session. Flash is required either way.
+     */
     fun pickFor(c: Cam, minFps: Int): Pick? {
         if (!c.hasFlash) return null
-        val s = c.yuv.filter { it.w >= 160 && it.fps >= minFps - 0.5 }.minByOrNull { it.w * it.h } ?: return null
-        return Pick(c, s.w, s.h, s.fps)
+        val s = c.yuv.filter { it.w >= 160 && it.fps >= minFps - 0.5 }.minByOrNull { it.w * it.h }
+        if (s != null) return Pick(c, s.w, s.h, s.fps)
+        val hs = hsCandidates(c, minFps)
+        val first = hs.firstOrNull() ?: return null
+        return Pick(c, first.w, first.h, first.hi.toDouble(), "highspeed", hs)
     }
 
     /** Why a camera is (not) usable, in words for the UI. */
     fun reason(c: Cam, minFps: Int): String = when {
         !c.hasFlash -> "no flash/torch"
-        c.maxFps < minFps - 0.5 -> "streams at most ${c.maxFps.roundToInt()} fps to apps (needs $minFps)"
+        pickFor(c, minFps) != null -> "ok"
+        c.maxFps < minFps - 0.5 -> "streams at most ${c.maxFps.roundToInt()} fps to apps (needs $minFps)" +
+            (if (c.maxHsFps > 0) "; its high-speed modes start below $minFps fps" else "")
         else -> "ok"
     }
 
@@ -166,6 +202,7 @@ object CameraCaps {
         return cands.maxWithOrNull(compareBy<Pick>(
             { it.maxFps >= targetFps - 0.5 },
             { (min(it.maxFps, targetFps.toDouble()) * 2).roundToInt() },
+            { it.mode == "yuv" },                 // regular stream preferred: manual exposure, simpler pipeline
             { it.cam.manual },
             { -abs((it.cam.equivMm ?: 26.0) - 26.0) },
             { it.cam.physicalId == null },
@@ -183,8 +220,11 @@ object CameraCaps {
         "aeFpsRanges" to c.aeRanges, "hardwareLevel" to c.hardwareLevel,
         "focalMm" to c.focalMm, "equivMm" to c.equivMm, "physicalIds" to c.physicalIds,
         "smallYuvSizes" to c.yuv.sortedBy { it.w * it.h }.take(6).map { mapOf("w" to it.w, "h" to it.h, "maxFps" to it.fps) },
-        "meetsTarget" to (c.hasFlash && c.maxFps >= targetFps - 0.5),
+        "meetsTarget" to ((pickFor(c, minFps)?.maxFps ?: 0.0) >= targetFps - 0.5),
         "meetsMinimum" to (pickFor(c, minFps) != null),
+        "mode" to pickFor(c, minFps)?.mode,
+        "usableFps" to pickFor(c, minFps)?.maxFps,
+        "highSpeedModes" to c.hs.map { mapOf("lo" to it.lo, "hi" to it.hi, "w" to it.w, "h" to it.h) },
         "reason" to reason(c, minFps))
 
     fun query(ctx: Context, targetFps: Int = 60, minFps: Int = targetFps, preferredKey: String? = null): Map<String, Any?> {
@@ -205,6 +245,7 @@ object CameraCaps {
             "meetsTarget" to (chosen != null && chosen.maxFps >= targetFps - 0.5),
             "supports60" to listing.cams.any { pickFor(it, 60) != null },   // legacy key
             "chosen" to chosen?.let { mapOf("key" to it.cam.key, "id" to it.cam.key, "label" to it.cam.label,
-                "w" to it.width, "h" to it.height, "maxFps" to it.maxFps, "manual" to it.manual) })
+                "w" to it.width, "h" to it.height, "maxFps" to it.maxFps, "manual" to it.manual,
+                "mode" to it.mode) })
     }
 }
