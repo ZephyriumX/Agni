@@ -31,7 +31,7 @@ class PpgSession(
     private val minFps: Int = targetFps,
     private val cameraKey: String? = null,   // null = automatic choice; otherwise the user's selected lens
     private val emit: (Map<String, Any?>) -> Unit,
-) {
+) : CaptureSession {
     private val thread = HandlerThread("ppg-camera").also { it.start() }
     private val bg = Handler(thread.looper)
     private var device: CameraDevice? = null
@@ -54,6 +54,9 @@ class PpgSession(
     private val buf = ArrayList<Double>(6 * 16)
     private var lastFlush = 0L
     private var framesSinceIso = 0
+    private var delegate: HsSession? = null
+    private val dlog = java.util.Collections.synchronizedList(ArrayList<String>())
+    override fun diag(): List<String> = delegate?.diag() ?: synchronized(dlog) { ArrayList(dlog) }
 
     @SuppressLint("MissingPermission")
     fun start(onOk: (Map<String, Any?>) -> Unit, onErr: (String, String) -> Unit) {
@@ -71,6 +74,15 @@ class PpgSession(
             }
             return
         }
+        if (pick.mode == "highspeed") {
+            // Regular YUV is too slow on this camera: use the constrained high-speed path (own thread + GL).
+            thread.quitSafely()
+            val hs = HsSession(ctx, targetFps, minFps, emit)
+            delegate = hs
+            hs.start(pick, onOk, onErr)
+            return
+        }
+        dlog.add("yuv path camera=${pick.cam.key} ${pick.width}x${pick.height} max=${pick.maxFps}fps")
         // Ask for what the stream can really do: never a shorter frame duration than its hardware minimum.
         frameNs = max(frameNs, (1e9 / pick.maxFps).toLong())
         // characteristics of the lens that actually produces the frames (physical lens if one was selected)
@@ -143,7 +155,7 @@ class PpgSession(
                     "logicalId" to pick.cam.logicalId, "physicalId" to pick.cam.physicalId,
                     "flash" to pick.cam.hasFlash, "width" to pick.width, "height" to pick.height,
                     "streamMaxFps" to pick.maxFps, "manualExposure" to manual, "targetFps" to targetFps,
-                    "minFps" to minFps, "platform" to "android"))
+                    "minFps" to minFps, "platform" to "android", "mode" to "yuv", "diag" to diag()))
             }
             override fun onConfigureFailed(s: CameraCaptureSession) {
                 onErr("SESSION_FAILED", "configure failed for ${pick.cam.label}" +
@@ -168,7 +180,7 @@ class PpgSession(
         b.set(CaptureRequest.SENSOR_FRAME_DURATION, frameNs)
     }
 
-    fun setLocked(l: Boolean) { locked = l }
+    override fun setLocked(l: Boolean) { locked = l; delegate?.setLocked(l) }
 
     private fun onImage(r: ImageReader) {
         val img = try { r.acquireNextImage() } catch (e: Exception) { null } ?: return
@@ -236,7 +248,8 @@ class PpgSession(
         return doubleArrayOf(r, g, bl, hi.toDouble() / n, lo.toDouble() / n)
     }
 
-    fun stop() {
+    override fun stop() {
+        delegate?.stop()
         if (closed) return
         closed = true
         try { captureSession?.stopRepeating() } catch (_: Exception) {}

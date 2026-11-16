@@ -52,4 +52,33 @@ class CameraChoiceTest {
         val cams = listOf(cam("0:3", 60.0, eq = 14.0, phys = "3"), cam("0:2", 60.0, eq = 26.0, phys = "2"))
         assertEquals("0:2", CameraCaps.choose(cams, 60, 55)?.cam?.key)
     }
+
+    // ---- constrained high-speed (realme P3 5G profile: YUV capped at 30 fps) ----
+    private fun hsCam(key: String = "0", vararg modes: CameraCaps.Hs) = Cam(
+        key = key, logicalId = key, physicalId = null, kind = "single", hasFlash = true, manual = true,
+        yuv = listOf(Sz(640, 480, 30.0), Sz(1920, 1080, 30.0)), surfaceMaxFps = 30.0,
+        highSpeed = emptyList(), aeRanges = emptyList(), hardwareLevel = 1, focalMm = 5.0, equivMm = 27.0,
+        physicalIds = emptyList(), hs = modes.toList())
+    private val p3 = arrayOf(CameraCaps.Hs(120, 120, 1280, 720), CameraCaps.Hs(240, 240, 1280, 720),
+        CameraCaps.Hs(30, 240, 1280, 720), CameraCaps.Hs(60, 240, 1280, 720), CameraCaps.Hs(30, 120, 1280, 720),
+        CameraCaps.Hs(60, 120, 1280, 720))
+
+    @Test fun yuvCappedAt30UsesHighSpeedWithFixed120() {
+        val p = CameraCaps.choose(listOf(hsCam("0", *p3)), 60, 55)
+        assertNotNull(p)
+        assertEquals("highspeed", p!!.mode)
+        assertEquals(120, p.hsCandidates.first().hi); assertEquals(120, p.hsCandidates.first().lo)
+        assertEquals("60,120", "${p.hsCandidates[1].lo},${p.hsCandidates[1].hi}")   // fallback range
+    }
+
+    @Test fun highSpeedRangeWhoseLowerBoundIsBelowMinimumIsRejected() {
+        val c = hsCam("0", CameraCaps.Hs(30, 120, 1280, 720))
+        assertNull(CameraCaps.choose(listOf(c), 60, 55))
+    }
+
+    @Test fun regularYuvIsPreferredOverHighSpeedAtEqualRate() {
+        val cams = listOf(hsCam("0", *p3), cam("1", 60.0))
+        assertEquals("1", CameraCaps.choose(cams, 60, 55)?.cam?.key)
+        assertEquals("yuv", CameraCaps.choose(cams, 60, 55)?.mode)
+    }
 }

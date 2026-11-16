@@ -21,7 +21,7 @@ class PpgCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventCha
     private lateinit var events: EventChannel
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var sink: EventChannel.EventSink? = null
-    private var session: PpgSession? = null
+    private var session: PpgSession? = null  // delegates to HsSession for high-speed mode
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         ctx = binding.applicationContext
@@ -65,6 +65,7 @@ class PpgCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventCha
                 session?.setLocked(call.argument<Boolean>("locked") ?: true)
                 result.success(null)
             }
+            "diagnostics" -> result.success(session?.diag() ?: emptyList<String>())
             "stop" -> { session?.stop(); session = null; result.success(null) }
             else -> result.notImplemented()
         }

@@ -28,3 +28,17 @@ Use **Copy diagnostics** on the blocked screen and send the text: it shows which
 ## Honest status
 Implemented, not compiled, not tested on any phone. Selection logic has JVM tests
 (`android/src/test/.../CameraChoiceTest.kt`) and the Dart parsing has `app/test/ppg_capabilities_test.dart`; neither has been run.
+
+
+## High-speed mode (v0.5.0)
+
+If no regular YUV stream reaches the minimum (55 fps), a camera is still usable when it offers a constrained
+high-speed range whose **lower** bound is >= the minimum. Preference: lowest upper bound, fixed ranges first
+(e.g. [120,120] before [60,120]); a regular YUV stream is preferred when equal. Physical lenses behind a logical
+camera are not offered high-speed (no per-lens routing for such sessions).
+
+High-speed sessions cannot feed an ImageReader, so frames go to a SurfaceTexture and a GPU shader averages a 32x32 grid over the
+centre 50 % into a float render target (8-bit would erase the pulse; if float rendering is unsupported the scan fails with
+`HS_GL_UNSUPPORTED`). Timestamps are the real sensor timestamps; the backend validates and analyses at the true rate (120 fps
+is not relabelled or downsampled). Exposure is auto, then AE/AWB-locked during measurement.
+Colour values come from the driver's YUV->RGB conversion, so they are not numerically identical to the YUV path.

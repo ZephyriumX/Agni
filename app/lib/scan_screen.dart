@@ -1,7 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -56,8 +55,7 @@ class _ScanScreenState extends State<ScanScreen> {
   CaptureReport? _capReport;
   PpgCapabilities? _capsObj;
   String? _cameraKey; // user's choice; null = automatic
-  int _gen =
-      0; // invalidates stale async restarts when the camera is changed quickly
+  int _gen = 0; // invalidates stale async restarts when the camera is changed quickly
 
   @override
   void initState() {
@@ -73,21 +71,13 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       await PpgCamera.stop();
     } catch (_) {}
-    if (mounted) {
-      setState(() {
-        _phase = Phase.init;
-        _error = null;
-        _status = 'Starting camera…';
-      });
-    }
+    if (mounted) setState(() { _phase = Phase.init; _error = null; _status = 'Starting camera…'; });
     // iOS: asked natively (no permission_handler build flags needed). Android: permission_handler.
     final granted = defaultTargetPlatform == TargetPlatform.iOS
         ? await PpgCamera.requestCameraPermission()
         : (await Permission.camera.request()).isGranted;
     if (!granted) {
-      _block(
-          'Camera permission is required to read your pulse. Enable it in the phone settings and tap Retry.',
-          null);
+      _block('Camera permission is required to read your pulse. Enable it in the phone settings and tap Retry.', null);
       return;
     }
     try {
@@ -95,15 +85,12 @@ class _ScanScreenState extends State<ScanScreen> {
       _cfg = await Api.captureConfig();
       _cameraKey = await AppConfig.cameraKey();
       var caps = await PpgCamera.capabilities(
-          targetFps: _cfg.nativeTargetFps,
-          minFps: _cfg.nativeMinFps,
-          cameraKey: _cameraKey);
+          targetFps: _cfg.nativeTargetFps, minFps: _cfg.nativeMinFps, cameraKey: _cameraKey);
       if (caps.raw['requestedKeyUnknown'] == true) {
         // the remembered camera no longer exists (new phone / OS update): fall back to automatic
         _cameraKey = null;
         await AppConfig.setCameraKey(null);
-        caps = await PpgCamera.capabilities(
-            targetFps: _cfg.nativeTargetFps, minFps: _cfg.nativeMinFps);
+        caps = await PpgCamera.capabilities(targetFps: _cfg.nativeTargetFps, minFps: _cfg.nativeMinFps);
       }
       if (gen != _gen || !mounted) return;
       _capsObj = caps;
@@ -112,22 +99,17 @@ class _ScanScreenState extends State<ScanScreen> {
         _block(_unusableMessage(caps), _capsText);
         return;
       }
-      _sub = PpgCamera.batches.listen(_onBatch,
-          onError: (Object e) => _block('Camera stream error: $e', _capsText));
+      _sub = PpgCamera.batches.listen(_onBatch, onError: (Object e) => _block('Camera stream error: $e', _capsText));
       _mon = SignalMonitor();
-      _fpsLive = 0;
-      _fpsCount = 0;
-      _fpsT0 = 0;
+      _fpsLive = 0; _fpsCount = 0; _fpsT0 = 0;
       _startInfo = await PpgCamera.start(
-          targetFps: _cfg.nativeTargetFps,
-          minFps: _cfg.nativeMinFps,
-          cameraKey: _cameraKey);
+          targetFps: _cfg.nativeTargetFps, minFps: _cfg.nativeMinFps, cameraKey: _cameraKey);
       if (gen != _gen || !mounted) return;
       WakelockPlus.enable();
       setState(() {
         _phase = Phase.ready;
-        _status =
-            'Camera running (${_startInfo!['width']}x${_startInfo!['height']}, '
+        _status = 'Camera running (${_startInfo!['width']}x${_startInfo!['height']}, '
+            '${_startInfo!['mode'] == 'highspeed' ? 'high-speed ${(_startInfo!['hsRange'] as List?)?.join('-')} fps, ' : ''}'
             '${_startInfo!['manualExposure'] == true ? 'manual' : 'auto'} exposure).';
       });
     } on PlatformException catch (e) {
@@ -162,39 +144,26 @@ class _ScanScreenState extends State<ScanScreen> {
       return '${c?.label ?? 'The selected camera'} cannot stream at least $min fps to apps '
           '(${c == null ? 'not available' : c.reason}). Choose another camera or Automatic.';
     }
-    final best = caps.cameras.isEmpty
-        ? 0.0
-        : caps.cameras.map((c) => c.maxFps).reduce((a, b) => a > b ? a : b);
-    final video = caps.cameras.isEmpty
-        ? 0.0
-        : caps.cameras
-            .map((c) => c.surfaceMaxFps)
-            .reduce((a, b) => a > b ? a : b);
+    final best = caps.cameras.isEmpty ? 0.0 : caps.cameras.map((c) => c.maxFps).reduce((a, b) => a > b ? a : b);
+    final video = caps.cameras.isEmpty ? 0.0 : caps.cameras.map((c) => c.surfaceMaxFps).reduce((a, b) => a > b ? a : b);
     final b = StringBuffer(caps.cameras.isEmpty
         ? 'No usable back camera was found on this phone.'
         : 'None of this phone\'s ${caps.cameras.length} back camera option(s) can give apps at least $min frames per second '
-            '(best: ${best.toStringAsFixed(0)} fps).');
+            '(best regular stream: ${best.toStringAsFixed(0)} fps; no high-speed mode starts at $min fps or more).');
     if (video >= _cfg.hardMinFps && best < _cfg.hardMinFps) {
-      b.write(
-          ' The phone reports ${video.toStringAsFixed(0)} fps for video recording, but only ${best.toStringAsFixed(0)} fps '
+      b.write(' The phone reports ${video.toStringAsFixed(0)} fps for video recording, but only ${best.toStringAsFixed(0)} fps '
           'for frame-by-frame access by apps, so its own camera app can record faster than this app can read.');
     }
     if (caps.hiddenPhysicalIds.isNotEmpty) {
-      b.write(
-          ' Android lists ${caps.hiddenPhysicalIds.length} more lens(es) it does not let apps use.');
+      b.write(' Android lists ${caps.hiddenPhysicalIds.length} more lens(es) it does not let apps use.');
     }
-    b.write(
-        ' Scans are never run at a lower rate or relabelled as ${_cfg.targetFps.toStringAsFixed(0)} fps.');
+    b.write(' Scans are never run at a lower rate or relabelled as ${_cfg.targetFps.toStringAsFixed(0)} fps.');
     return b.toString();
   }
 
   void _block(String msg, String? caps) {
     if (!mounted) return;
-    setState(() {
-      _phase = Phase.blocked;
-      _error = msg;
-      _capsText = caps ?? _capsText;
-    });
+    setState(() { _phase = Phase.blocked; _error = msg; _capsText = caps ?? _capsText; });
   }
 
   Future<void> _selectCamera(String? key) async {
@@ -212,24 +181,15 @@ class _ScanScreenState extends State<ScanScreen> {
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: ConstrainedBox(
-          constraints:
-              BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
-          child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              shrinkWrap: true,
-              children: [
-                Text('Choose camera',
-                    style: Theme.of(ctx).textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(
-                    'Only back cameras are listed. Automatic picks the fastest usable one.',
-                    style: Theme.of(ctx).textTheme.bodySmall),
-                const SizedBox(height: 8),
-                _cameraList(caps, (key) {
-                  Navigator.pop(ctx);
-                  _selectCamera(key);
-                }),
-              ]),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+          child: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), shrinkWrap: true, children: [
+            Text('Choose camera', style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text('Only back cameras are listed. Automatic picks the fastest usable one.',
+                style: Theme.of(ctx).textTheme.bodySmall),
+            const SizedBox(height: 8),
+            _cameraList(caps, (key) { Navigator.pop(ctx); _selectCamera(key); }),
+          ]),
         ),
       ),
     );
@@ -241,25 +201,18 @@ class _ScanScreenState extends State<ScanScreen> {
     return Column(children: [
       ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: Icon(_cameraKey == null
-            ? Icons.check_circle
-            : Icons.radio_button_unchecked),
+        leading: Icon(_cameraKey == null ? Icons.check_circle : Icons.radio_button_unchecked),
         title: const Text('Automatic (recommended)'),
-        subtitle: Text(auto == null
-            ? 'No camera reaches the minimum fps'
-            : 'Currently: ${auto.label}'),
+        subtitle: Text(auto == null ? 'No camera reaches the minimum fps' : 'Currently: ${auto.label}'),
         enabled: auto != null,
         onTap: auto == null ? null : () => onPick(null),
       ),
       for (final c in caps.cameras)
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(_cameraKey == c.key
-              ? Icons.check_circle
-              : Icons.radio_button_unchecked),
+          leading: Icon(_cameraKey == c.key ? Icons.check_circle : Icons.radio_button_unchecked),
           title: Text(c.label),
-          subtitle: Text('Up to ${c.maxFps.toStringAsFixed(0)} fps to apps'
-              '${c.surfaceMaxFps > c.maxFps + 1 ? ' (video mode ${c.surfaceMaxFps.toStringAsFixed(0)})' : ''}'
+          subtitle: Text('${c.usable ? c.speedLabel : 'Up to ${c.maxFps.toStringAsFixed(0)} fps to apps'}'
               ' · flash ${c.hasFlash ? 'yes' : 'no'}'
               '${c.usable ? '' : '\nNot usable: ${c.reason}'}'),
           isThreeLine: !c.usable,
@@ -280,79 +233,38 @@ class _ScanScreenState extends State<ScanScreen> {
       _mon.add(ts, f[o + 1], f[o + 2], f[o + 3], f[o + 4], f[o + 5]);
       if (_fpsT0 == 0) _fpsT0 = ts;
       _fpsCount++;
-      if (ts - _fpsT0 >= 1.0) {
-        _fpsLive = _fpsCount / (ts - _fpsT0);
-        _fpsCount = 0;
-        _fpsT0 = ts;
-      }
+      if (ts - _fpsT0 >= 1.0) { _fpsLive = _fpsCount / (ts - _fpsT0); _fpsCount = 0; _fpsT0 = ts; }
       if (_phase == Phase.recording) {
         if (!_mon.finger) {
           if (_lostSince < 0) _lostSince = ts;
-          if (ts - _lostSince > 0.6) {
-            _abort('Finger lifted during the scan. Please try again.');
-            return;
-          }
+          if (ts - _lostSince > 0.6) { _abort('Finger lifted during the scan. Please try again.'); return; }
         } else {
           _lostSince = -1;
         }
-        _t.add(ts - _recT0);
-        _red.add(f[o + 1]);
-        _green.add(f[o + 2]);
-        if (ts - _recT0 >= scanSeconds) {
-          _finish();
-          return;
-        }
+        _t.add(ts - _recT0); _red.add(f[o + 1]); _green.add(f[o + 2]);
+        if (ts - _recT0 >= scanSeconds) { _finish(); return; }
       }
     }
-    _iso = b.iso;
-    _expNs = b.exposureNs;
-    _frameNs = b.frameDurationNs;
-    _locked = b.locked;
+    _iso = b.iso; _expNs = b.exposureNs; _frameNs = b.frameDurationNs; _locked = b.locked;
     // lock exposure once the finger is stable and R is in the usable band
-    if (_phase == Phase.ready &&
-        !_locked &&
-        _mon.stableSeconds(_now) > 2.0 &&
-        _mon.exposureOk) {
+    if (_phase == Phase.ready && !_locked && _mon.stableSeconds(_now) > 2.0 && _mon.exposureOk) {
       PpgCamera.setExposureLock(true);
     }
-    if (_phase == Phase.recording) {
-      _progress = ((_now - _recT0) / scanSeconds).clamp(0.0, 1.0);
-    }
+    if (_phase == Phase.recording) _progress = ((_now - _recT0) / scanSeconds).clamp(0.0, 1.0);
     if (mounted) setState(() {});
   }
 
-  bool get _canStart =>
-      _phase == Phase.ready &&
-      _mon.finger &&
-      _mon.stableSeconds(_now) > 2.0 &&
-      _mon.exposureOk;
+  bool get _canStart => _phase == Phase.ready && _mon.finger && _mon.stableSeconds(_now) > 2.0 && _mon.exposureOk;
 
   void _start() {
-    _t.clear();
-    _red.clear();
-    _green.clear();
-    _recT0 = _now;
-    _lostSince = -1;
-    _progress = 0;
-    _capReport = null;
-    setState(() {
-      _phase = Phase.recording;
-      _result = null;
-      _status = 'Recording… stay still and breathe normally.';
-    });
+    _t.clear(); _red.clear(); _green.clear();
+    _recT0 = _now; _lostSince = -1; _progress = 0; _capReport = null;
+    setState(() { _phase = Phase.recording; _result = null; _status = 'Recording… stay still and breathe normally.'; });
   }
 
   void _abort(String msg) {
-    _t.clear();
-    _red.clear();
-    _green.clear();
-    if (mounted) {
-      setState(() {
-        _phase = Phase.ready;
-        _progress = 0;
-        _status = msg;
-      });
-    }
+    _t.clear(); _red.clear(); _green.clear();
+    if (mounted) setState(() { _phase = Phase.ready; _progress = 0; _status = msg; });
   }
 
   Future<void> _finish() async {
@@ -362,18 +274,13 @@ class _ScanScreenState extends State<ScanScreen> {
     if (rep.status == CaptureStatus.fail) {
       await PpgCamera.stop();
       WakelockPlus.disable();
-      _t.clear();
-      _red.clear();
-      _green.clear();
+      _t.clear(); _red.clear(); _green.clear();
       _fail('${rep.headline}.\n${rep.messages.join('\n')}\n\n'
           'Tips: close other apps, let the phone cool down, keep your finger still, and scan again. '
           'If it keeps happening, try a different camera.');
       return;
     }
-    setState(() {
-      _phase = Phase.uploading;
-      _status = 'Uploading and analysing…';
-    });
+    setState(() { _phase = Phase.uploading; _status = 'Uploading and analysing…'; });
     final payload = <String, dynamic>{
       'client_scan_id': const Uuid().v4(),
       'tag': _tag,
@@ -383,32 +290,23 @@ class _ScanScreenState extends State<ScanScreen> {
       'red': _red.map((x) => double.parse(x.toStringAsFixed(3))).toList(),
       'green': _green.map((x) => double.parse(x.toStringAsFixed(3))).toList(),
     };
-    await PpgCamera
-        .stop(); // torch off + camera released as soon as sampling is done
+    await PpgCamera.stop(); // torch off + camera released as soon as sampling is done
     WakelockPlus.disable();
     try {
       if (_tag == 'Post-Meal' && _meal.text.trim().isNotEmpty) {
         try {
-          payload['meal_id'] =
-              (await Api.createMeal(_meal.text.trim()))['meal_id'];
+          payload['meal_id'] = (await Api.createMeal(_meal.text.trim()))['meal_id'];
         } on ApiError catch (e) {
-          if (!e.retryable) {
-            rethrow; // offline: the scan itself is still saved below, meal label skipped
-          }
+          if (!e.retryable) rethrow; // offline: the scan itself is still saved below, meal label skipped
         }
       }
       final res = await Api.processScan(payload);
       if (!mounted) return;
-      setState(() {
-        _result = res;
-        _phase = Phase.done;
-        _status = 'Done';
-      });
+      setState(() { _result = res; _phase = Phase.done; _status = 'Done'; });
     } on ApiError catch (e) {
       if (e.retryable || e.kind == ApiErrorKind.unauthorized) {
         await PendingQueue.add(payload);
-        _fail(
-            '${e.message}\n\nYour recording was SAVED on this phone and will upload automatically '
+        _fail('${e.message}\n\nYour recording was SAVED on this phone and will upload automatically '
             'when the server is reachable (Home shows pending uploads).');
       } else {
         _fail(e.message);
@@ -417,14 +315,7 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   void _fail(String msg) {
-    if (mounted) {
-      setState(() {
-        _phase = Phase.done;
-        _result = null;
-        _error = msg;
-        _status = 'Failed';
-      });
-    }
+    if (mounted) setState(() { _phase = Phase.done; _result = null; _error = msg; _status = 'Failed'; });
   }
 
   @override
@@ -443,15 +334,13 @@ class _ScanScreenState extends State<ScanScreen> {
     final live = _phase == Phase.ready || _phase == Phase.recording;
     return Scaffold(
       appBar: AppBar(title: const Text('New scan')),
-      body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-          children: [
-            if (_phase == Phase.blocked) ..._blocked(),
-            if (_phase == Phase.init) _initView(),
-            if (live) ..._liveView(),
-            if (_phase == Phase.uploading) _uploadingView(),
-            if (_phase == Phase.done) ..._doneView(),
-          ]),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
+        if (_phase == Phase.blocked) ..._blocked(),
+        if (_phase == Phase.init) _initView(),
+        if (live) ..._liveView(),
+        if (_phase == Phase.uploading) _uploadingView(),
+        if (_phase == Phase.done) ..._doneView(),
+      ]),
     );
   }
 
@@ -480,43 +369,33 @@ class _ScanScreenState extends State<ScanScreen> {
       };
 
   List<Widget> _blocked() => [
-        InfoBanner(
-            tone: CaptureStatus.fail,
-            icon: Icons.videocam_off,
-            text: _error ?? 'Camera unavailable'),
+        InfoBanner(tone: CaptureStatus.fail, icon: Icons.videocam_off, text: _error ?? 'Camera unavailable'),
         if (_capsObj != null && _capsObj!.cameras.isNotEmpty)
           SectionCard(
             title: 'Back cameras on this phone',
             icon: Icons.photo_camera_back,
             child: _cameraList(_capsObj!, (key) => _selectCamera(key)),
           ),
-        FilledButton.icon(
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-            onPressed: _init),
+        FilledButton.icon(icon: const Icon(Icons.refresh), label: const Text('Retry'), onPressed: _init),
         const SizedBox(height: 8),
         if (_cameraKey != null)
-          OutlinedButton(
-              onPressed: () => _selectCamera(null),
-              child: const Text('Use automatic camera selection')),
+          OutlinedButton(onPressed: () => _selectCamera(null), child: const Text('Use automatic camera selection')),
         TextButton.icon(
           icon: const Icon(Icons.copy),
           label: const Text('Copy diagnostics'),
           onPressed: () async {
-            await Clipboard.setData(ClipboardData(
-                text: 'platform: $_platformName\n${_capsText ?? ''}'));
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Diagnostics copied')));
-            }
+            final log = (await PpgCamera.diagnostics()).join('\n');
+            await Clipboard.setData(ClipboardData(text: 'platform: $_platformName\n${_capsText ?? ''}'
+                '${_startInfo?['diag'] != null ? '\n--- session log ---\n${(_startInfo!['diag'] as List).join('\n')}' : ''}'
+                '${log.isEmpty ? '' : '\n--- live log ---\n$log'}'));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Diagnostics copied')));
           },
         ),
         ExpansionTile(
           title: const Text('Technical details'),
           childrenPadding: const EdgeInsets.all(8),
           children: [
-            SelectableText(_capsText ?? '',
-                style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+            SelectableText(_capsText ?? '', style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
           ],
         ),
       ];
@@ -524,69 +403,49 @@ class _ScanScreenState extends State<ScanScreen> {
   List<Widget> _liveView() {
     final cs = Theme.of(context).colorScheme;
     final recording = _phase == Phase.recording;
-    final cam = _capsObj?.cameraByKey(_startInfo?['cameraKey']?.toString()) ??
-        _capsObj?.chosenCamera;
+    final cam = _capsObj?.cameraByKey(_startInfo?['cameraKey']?.toString()) ?? _capsObj?.chosenCamera;
     final secondsLeft = (scanSeconds * (1 - _progress)).ceil();
     final hint = _mon.hint();
     return [
       SectionCard(
         title: 'Camera',
         icon: Icons.photo_camera,
-        trailing: TextButton(
-            onPressed: recording ? null : _openCameraSheet,
-            child: const Text('Change')),
+        trailing: TextButton(onPressed: recording ? null : _openCameraSheet, child: const Text('Change')),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(cam?.label ?? 'Camera ${_startInfo?['cameraKey'] ?? ''}',
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(cam?.label ?? 'Camera ${_startInfo?['cameraKey'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           Wrap(spacing: 8, runSpacing: 6, children: [
             Chip(
               visualDensity: VisualDensity.compact,
               avatar: const Icon(Icons.speed, size: 16),
-              label: Text(_fpsLive > 0
-                  ? '${_fpsLive.toStringAsFixed(1)} fps live'
-                  : '${cam?.maxFps.toStringAsFixed(0) ?? '?'} fps max'),
+              label: Text(_fpsLive > 0 ? '${_fpsLive.toStringAsFixed(1)} fps live' : '${cam?.speedLabel ?? '? fps'}'),
             ),
             Chip(
               visualDensity: VisualDensity.compact,
-              avatar: Icon(
-                  cam?.hasFlash == false ? Icons.flash_off : Icons.flash_on,
-                  size: 16),
+              avatar: Icon(cam?.hasFlash == false ? Icons.flash_off : Icons.flash_on, size: 16),
               label: Text(cam?.hasFlash == false ? 'No flash' : 'Flash on'),
             ),
             Chip(
               visualDensity: VisualDensity.compact,
               avatar: const Icon(Icons.exposure, size: 16),
-              label: Text(_startInfo?['manualExposure'] == true
-                  ? 'Manual exposure'
-                  : 'Auto exposure'),
+              label: Text(_startInfo?['manualExposure'] == true ? 'Manual exposure' : 'Auto exposure'),
             ),
           ]),
           if (_cameraKey == null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text('Automatic selection',
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+              child: Text('Automatic selection', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
             ),
         ]),
       ),
       if (!recording)
-        const SectionCard(
+        SectionCard(
           title: 'How to scan',
           icon: Icons.touch_app,
-          child: Column(children: [
-            StepRow(
-                n: 1,
-                text:
-                    'Sit down, rest your hand on a table, and breathe normally.'),
-            StepRow(
-                n: 2,
-                text:
-                    'Cover the rear camera AND the flash fully with your fingertip, pressing lightly.'),
-            StepRow(
-                n: 3,
-                text:
-                    'Wait for "Good signal", then start. Stay still for 35 seconds.'),
+          child: const Column(children: [
+            StepRow(n: 1, text: 'Sit down, rest your hand on a table, and breathe normally.'),
+            StepRow(n: 2, text: 'Cover the rear camera AND the flash fully with your fingertip, pressing lightly.'),
+            StepRow(n: 3, text: 'Wait for "Good signal", then start. Stay still for 35 seconds.'),
           ]),
         ),
       if (!recording)
@@ -595,20 +454,14 @@ class _ScanScreenState extends State<ScanScreen> {
           icon: Icons.tune,
           child: Column(children: [
             DropdownButtonFormField<String>(
-              initialValue: _tag,
+              value: _tag,
               decoration: const InputDecoration(labelText: 'Scan context'),
-              items: [
-                for (final t in scanTags)
-                  DropdownMenuItem(value: t, child: Text(t))
-              ],
+              items: [for (final t in scanTags) DropdownMenuItem(value: t, child: Text(t))],
               onChanged: (v) => setState(() => _tag = v!),
             ),
             if (_tag == 'Post-Meal') ...[
               const SizedBox(height: 12),
-              TextField(
-                  controller: _meal,
-                  decoration: const InputDecoration(
-                      labelText: 'What did you eat? (for your diary)')),
+              TextField(controller: _meal, decoration: const InputDecoration(labelText: 'What did you eat? (for your diary)')),
             ],
             const SizedBox(height: 10),
             Align(
@@ -618,24 +471,16 @@ class _ScanScreenState extends State<ScanScreen> {
                   FilterChip(
                     label: Text(c),
                     selected: _ctx.contains(c),
-                    onSelected: (s) =>
-                        setState(() => s ? _ctx.add(c) : _ctx.remove(c)),
+                    onSelected: (s) => setState(() => s ? _ctx.add(c) : _ctx.remove(c)),
                   ),
               ]),
             ),
           ]),
         ),
       InfoBanner(
-        tone: _mon.finger
-            ? (_canStart || recording
-                ? CaptureStatus.pass
-                : CaptureStatus.warning)
-            : CaptureStatus.warning,
+        tone: _mon.finger ? (_canStart || recording ? CaptureStatus.pass : CaptureStatus.warning) : CaptureStatus.warning,
         icon: _mon.finger ? Icons.check_circle : Icons.fingerprint,
-        text: hint ??
-            (recording
-                ? 'Recording: keep still.'
-                : (_canStart ? 'Good signal. Ready to scan.' : 'Hold still…')),
+        text: hint ?? (recording ? 'Recording: keep still.' : (_canStart ? 'Good signal. Ready to scan.' : 'Hold still…')),
       ),
       SectionCard(
         padding: const EdgeInsets.all(8),
@@ -643,14 +488,12 @@ class _ScanScreenState extends State<ScanScreen> {
           SizedBox(
             height: 170,
             child: CustomPaint(
-                painter: WaveformPainter(_mon.displayPpg(), _mon.displayApg(),
-                    Colors.deepOrange, Colors.indigo),
+                painter: WaveformPainter(_mon.displayPpg(), _mon.displayApg(), Colors.deepOrange, Colors.indigo),
                 size: Size.infinite),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-            child: Text(
-                'Top: pulse wave (PPG). Bottom: APG. Display only; metrics are computed on the server.',
+            child: Text('Top: pulse wave (PPG). Bottom: APG. Display only; metrics are computed on the server.',
                 style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
           ),
         ]),
@@ -663,24 +506,16 @@ class _ScanScreenState extends State<ScanScreen> {
               width: 132,
               height: 132,
               child: Stack(alignment: Alignment.center, children: [
-                SizedBox(
-                    width: 132,
-                    height: 132,
-                    child: CircularProgressIndicator(
-                        value: _progress, strokeWidth: 9)),
+                SizedBox(width: 132, height: 132, child: CircularProgressIndicator(value: _progress, strokeWidth: 9)),
                 Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text('$secondsLeft',
-                      style: const TextStyle(
-                          fontSize: 38, fontWeight: FontWeight.w800)),
+                  Text('$secondsLeft', style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w800)),
                   const Text('seconds left'),
                 ]),
               ]),
             ),
             const SizedBox(height: 8),
             Text(_status, textAlign: TextAlign.center),
-            TextButton(
-                onPressed: () => _abort('Scan cancelled.'),
-                child: const Text('Cancel')),
+            TextButton(onPressed: () => _abort('Scan cancelled.'), child: const Text('Cancel')),
           ]),
         )
       else ...[
@@ -691,9 +526,7 @@ class _ScanScreenState extends State<ScanScreen> {
         ),
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Text(_status,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: cs.onSurfaceVariant)),
+          child: Text(_status, textAlign: TextAlign.center, style: TextStyle(color: cs.onSurfaceVariant)),
         ),
       ],
       ExpansionTile(
@@ -717,19 +550,12 @@ class _ScanScreenState extends State<ScanScreen> {
     final res = _result;
     return [
       if (res != null) ResultView(result: res, onVajrasana: _openVajrasana),
-      if (res == null && _error != null)
-        InfoBanner(
-            tone: CaptureStatus.fail, icon: Icons.error_outline, text: _error!),
+      if (res == null && _error != null) InfoBanner(tone: CaptureStatus.fail, icon: Icons.error_outline, text: _error!),
       if (_capReport != null) _diagnostics(),
       const SizedBox(height: 8),
-      FilledButton(
-          onPressed: () => Navigator.pop(context, _result),
-          child: const Text('Done')),
+      FilledButton(onPressed: () => Navigator.pop(context, _result), child: const Text('Done')),
       const SizedBox(height: 8),
-      OutlinedButton.icon(
-          icon: const Icon(Icons.refresh),
-          label: const Text('Scan again'),
-          onPressed: _init),
+      OutlinedButton.icon(icon: const Icon(Icons.refresh), label: const Text('Scan again'), onPressed: _init),
     ];
   }
 
@@ -744,41 +570,28 @@ class _ScanScreenState extends State<ScanScreen> {
     final flash = _startInfo?['flash'];
     final rows = <String>[
       line('Platform', _platformName),
-      line(
-          'Camera',
-          _startInfo == null
-              ? '-'
-              : '${_startInfo!['cameraLabel'] ?? 'id ${_startInfo!['cameraKey'] ?? _startInfo!['cameraId']}'} '
-                  '(${_startInfo!['width']}x${_startInfo!['height']})'),
-      line(
-          'Flash',
-          flash == null
-              ? 'unknown'
-              : (flash == true ? 'available' : 'not available')),
+      line('Camera', _startInfo == null
+          ? '-'
+          : '${_startInfo!['cameraLabel'] ?? 'id ${_startInfo!['cameraKey'] ?? _startInfo!['cameraId']}'} '
+              '(${_startInfo!['width']}x${_startInfo!['height']})'),
+      line('Capture mode', _startInfo?['mode'] == 'highspeed'
+          ? 'high-speed ${(_startInfo!['hsRange'] as List?)?.join('-')} fps (GPU reader, ${_startInfo!['precision']})'
+          : 'regular YUV stream'),
+      line('Flash', flash == null ? 'unknown' : (flash == true ? 'available' : 'not available')),
       line('Target FPS', _cfg.targetFps.toStringAsFixed(0)),
-      line('Minimum FPS',
-          '${_cfg.hardMinFps.toStringAsFixed(0)} (preferred ${_cfg.preferredMinFps.toStringAsFixed(0)}+)'),
-      line(
-          'Actual FPS',
-          rep != null
-              ? rep.fsMean.toStringAsFixed(1)
-              : '${_fpsLive.toStringAsFixed(1)} (live)'),
+      line('Minimum FPS', '${_cfg.hardMinFps.toStringAsFixed(0)} (preferred ${_cfg.preferredMinFps.toStringAsFixed(0)}+)'),
+      line('Actual FPS', rep != null ? rep.fsMean.toStringAsFixed(1) : '${_fpsLive.toStringAsFixed(1)} (live)'),
       if (rep != null && rep.timestampsValid) ...[
-        line('Frame drops',
-            '${(rep.dropRatio * 100).toStringAsFixed(1)}% (${rep.missingFrames} frames)'),
+        line('Frame drops', '${(rep.dropRatio * 100).toStringAsFixed(1)}% (${rep.missingFrames} frames)'),
         line('Longest gap', '${(rep.maxGapS * 1000).toStringAsFixed(0)} ms'),
-        line('Interval variability',
-            '${(rep.jitterCv * 100).toStringAsFixed(1)}%'),
+        line('Interval variability', '${(rep.jitterCv * 100).toStringAsFixed(1)}%'),
         line('Capture duration', '${rep.durationS.toStringAsFixed(1)} s'),
       ],
-      line(
-          'Capture status',
-          timing == null
-              ? (_phase == Phase.recording ? 'recording' : 'ready')
-              : '${statusLabel(timing)}${rep != null ? ' - ${rep.headline}' : ''}'),
+      line('Capture status', timing == null
+          ? (_phase == Phase.recording ? 'recording' : 'ready')
+          : '${statusLabel(timing)}${rep != null ? ' - ${rep.headline}' : ''}'),
       if (sqiOk != null) line('Signal quality', sqiOk ? 'Pass' : 'Fail'),
-      if (res?['final_status'] != null)
-        line('Final result', '${res!['final_status']}'),
+      if (res?['final_status'] != null) line('Final result', '${res!['final_status']}'),
       if (rep != null) ...[for (final m in rep.messages) '  • $m'],
     ];
     final s = StatusStyle.of(context, timing);
@@ -786,10 +599,8 @@ class _ScanScreenState extends State<ScanScreen> {
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
-      decoration:
-          BoxDecoration(color: s.bg, borderRadius: BorderRadius.circular(14)),
-      child: SelectableText(rows.join('\n'),
-          style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: s.fg)),
+      decoration: BoxDecoration(color: s.bg, borderRadius: BorderRadius.circular(14)),
+      child: SelectableText(rows.join('\n'), style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: s.fg)),
     );
   }
 

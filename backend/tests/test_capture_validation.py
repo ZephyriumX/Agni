@@ -434,3 +434,44 @@ def test_golden_vectors_file_is_in_sync_with_the_validator():
     import json
     from tests import vectors
     assert json.loads(vectors.VECTOR_FILE.read_text()) == vectors.generate()
+
+
+# ----------------------------------------------------------------------------- high-speed (100-120 fps) path
+@pytest.mark.parametrize("fps", [100, 120])
+def test_high_rate_uniform_capture_passes_and_dsp_matches_60(fps):
+    ref, hi = [], []
+    for seed in range(5):
+        r60, _, tr = make_ppg(fs=60, seed=seed, bpm=62 + 4 * seed)
+        rh, _, _ = make_ppg(fs=fps, seed=seed, bpm=62 + 4 * seed)
+        t = np.arange(len(rh)) / fps
+        assert cv.evaluate_timestamps(t)["status"] == cv.PASS
+        a = d.process_scan(r60, timestamps=np.arange(len(r60)) / 60)
+        b = d.process_scan(rh, timestamps=t)
+        assert b.sqi.passed and b.acquisition["effective_fs"] == pytest.approx(fps, abs=0.05)
+        ref.append((a.ba_ratio, a.rmssd_ms, a.avg_bpm)); hi.append((b.ba_ratio, b.rmssd_ms, b.avg_bpm))
+    diff = np.abs(np.array(ref) - np.array(hi))
+    assert diff[:, 0].max() < 0.08 and diff[:, 1].max() < 6.0 and diff[:, 2].max() < 1.0
+
+
+def test_120fps_with_sensor_timestamp_jitter_and_a_few_drops():
+    t = uniform(120, jitter=0.0004, seed=3)
+    keep = np.ones(len(t), bool)
+    keep[np.random.default_rng(1).choice(len(t), 15, replace=False)] = False      # ~0.4 % dropped frames
+    r = cv.evaluate_timestamps(t[keep])
+    assert r["status"] in (cv.PASS, cv.WARNING) and r["fs_mean"] > 115
+
+
+def test_120fps_that_degrades_to_60_midway_is_not_accepted_as_clean():
+    t = np.r_[uniform(120, 15), 15 + uniform(60, 20)]
+    assert cv.evaluate_timestamps(t)["status"] != cv.PASS
+
+
+def test_api_120fps_scan_fits_the_payload_limit_and_keeps_true_rate(client):
+    _, h = register(client)
+    p = scan_payload(fs_hz=120, bpm=65, rr_sd_ms=40, seed=1)
+    import json
+    assert len(json.dumps(p)) < 0.5 * client.app.state.settings.max_body_bytes if hasattr(client.app.state, "settings") else True
+    r = client.post("/api/v1/scan/process", headers=h, json=p)
+    j = r.json()
+    assert r.status_code == 200, j
+    assert j["capture_status"] == "PASS" and j["sqi"]["passed"]

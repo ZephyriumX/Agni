@@ -1,0 +1,20 @@
+# Local stack: PostgreSQL 16 + API. For Supabase, drop the `db` service and put your Supabase
+# connection string in DATABASE_URL (see .env.example).
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: agni_dev_only
+      POSTGRES_DB: agni
+    volumes: ["agni_pg:/var/lib/postgresql/data"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 3s, retries: 20 }
+  api:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["8000:8000"]
+    environment:
+      AGNI_ENV: development
+      DATABASE_URL: postgresql://postgres:agni_dev_only@db:5432/agni
+      AGNI_REGISTRATION_KEY: ${AGNI_REGISTRATION_KEY:-}
+volumes:
+  agni_pg:

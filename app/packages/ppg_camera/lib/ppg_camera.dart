@@ -17,11 +17,18 @@ class PpgCameraInfo {
   /// own camera app may record faster than third-party apps can read frames.
   final double surfaceMaxFps;
   final double? equivMm;
+
+  /// How this camera reaches the minimum rate: 'yuv' (regular stream), 'highspeed' (constrained high-speed
+  /// session read on the GPU) or null (cannot).
+  final String? mode;
+
+  /// Frame rate the analysis will really get with [mode] (null if unusable).
+  final double? usableFps;
   final String reason; // 'ok' or why it cannot be used
   final Map<String, dynamic> raw;
 
   PpgCameraInfo._(this.key, this.label, this.kind, this.hasFlash, this.manualSensor, this.meetsMinimum,
-      this.meetsTarget, this.maxFps, this.surfaceMaxFps, this.equivMm, this.reason, this.raw);
+      this.meetsTarget, this.maxFps, this.surfaceMaxFps, this.equivMm, this.mode, this.usableFps, this.reason, this.raw);
 
   factory PpgCameraInfo.fromMap(Map m) {
     final key = (m['key'] ?? m['id']).toString();
@@ -36,12 +43,20 @@ class PpgCameraInfo {
       ((m['maxYuvFps'] ?? m['maxFps'] ?? 0) as num).toDouble(),
       ((m['surfaceMaxFps'] ?? 0) as num).toDouble(),
       (m['equivMm'] as num?)?.toDouble(),
+      m['mode'] as String?,
+      (m['usableFps'] as num?)?.toDouble(),
       (m['reason'] as String?) ?? 'ok',
       Map<String, dynamic>.from(m),
     );
   }
 
   bool get usable => meetsMinimum;
+  bool get highSpeed => mode == 'highspeed';
+
+  /// "60 fps" / "120 fps (high-speed mode)" for the UI.
+  String get speedLabel => usableFps == null
+      ? 'max ${maxFps.toStringAsFixed(0)} fps'
+      : '${usableFps!.toStringAsFixed(0)} fps${highSpeed ? ' (high-speed mode)' : ''}';
 }
 
 /// Capabilities as reported by the platform camera API (not guesses).
@@ -116,7 +131,7 @@ class PpgCapabilities {
         '${hiddenPhysicalIds.isEmpty ? '' : '  hidden physical lenses: ${hiddenPhysicalIds.join(', ')}'}');
     for (final c in cameras) {
       b.writeln('camera ${c.key} [${c.kind}] ${c.label}: flash=${c.hasFlash} manualSensor=${c.manualSensor} '
-          'yuvMaxFps=${c.maxFps.toStringAsFixed(1)} videoMaxFps=${c.surfaceMaxFps.toStringAsFixed(1)} '
+          'mode=${c.mode} usableFps=${c.usableFps} yuvMaxFps=${c.maxFps.toStringAsFixed(1)} videoMaxFps=${c.surfaceMaxFps.toStringAsFixed(1)} '
           'aeFps=${c.raw['aeFpsRanges']} highSpeed=${c.raw['highSpeedFpsRanges']} -> ${c.usable ? 'usable' : c.reason}');
     }
     b.write(meetsMinimum
@@ -164,6 +179,15 @@ class PpgCamera {
 
   static Future<void> setExposureLock(bool locked) => _m.invokeMethod('setExposureLock', {'locked': locked});
   static Future<void> stop() => _m.invokeMethod('stop');
+
+  /// Step-by-step log of the running capture session (empty when none). For "Copy diagnostics".
+  static Future<List<String>> diagnostics() async {
+    try {
+      return ((await _m.invokeMethod('diagnostics')) as List?)?.map((e) => e.toString()).toList() ?? const [];
+    } on MissingPluginException {
+      return const [];
+    }
+  }
 
   static Stream<PpgBatch> get batches => _e.receiveBroadcastStream().map((o) {
         final m = o as Map;

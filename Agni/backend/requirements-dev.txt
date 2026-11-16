@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest>=8.0
+httpx>=0.27
+# Real-PostgreSQL tests: either install PostgreSQL server binaries (tests start a throw-away cluster)
+# or set DATABASE_URL_TEST to an empty scratch database.

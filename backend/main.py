@@ -123,7 +123,7 @@ class BodyLimit:
 def create_app(settings: Optional[Settings] = None, store=None) -> FastAPI:
     settings = settings or Settings.load()
     store = store or make_store(settings)
-    app = FastAPI(title="Agni-Pulse API", version="0.4.0", description=DISCLAIMER)
+    app = FastAPI(title="Agni-Pulse API", version="0.5.0", description=DISCLAIMER)
     app.state.settings, app.state.store = settings, store
     current_user = auth.make_current_user(settings, lambda: store)
     reg_limiter = auth.RateLimiter(settings.register_per_hour, 3600)

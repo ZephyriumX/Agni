@@ -1,5 +1,5 @@
 name: ppg_camera
-description: "Native raw-frame PPG capture. Android Camera2 (Kotlin) and iOS AVFoundation (Swift): torch, exposure control, sensor timestamps, camera selection."
+description: Native raw-frame PPG capture. Android Camera2 (Kotlin) and iOS AVFoundation (Swift): torch, exposure control, sensor timestamps, camera selection.
 version: 0.2.0
 publish_to: none
 
