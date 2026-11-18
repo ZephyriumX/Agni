@@ -1,0 +1,50 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+*.pyc
+.dart_tool/
+build/
+*.rejected
+.env.*
+!.env.example
+*.apk
+*.aab
+*.jks
+*.keystore
+app/android/key.properties
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+**/build/
+**/.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+Thumbs.db
+.DS_Store
