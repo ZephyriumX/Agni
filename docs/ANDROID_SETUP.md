@@ -23,7 +23,8 @@ adb reverse tcp:8000 tcp:8000
 ```
 (Never use `10.0.2.2` on a real phone: it only exists inside the emulator.) Wi-Fi alternative: run the server with
 `--host 0.0.0.0`, allow TCP 8000 in the firewall (Private network only; `scripts/windows_firewall.ps1` on Windows) and
-set *Setup → API base URL* in the app to `http://<PC-IP>:8000`.
+set *Server* (welcome screen, or Profile → Server & camera) to `http://<PC-IP>:8000`.
+**To use the app without the cable or shared Wi-Fi, deploy the server: `docs/REMOTE_ACCESS.md`.**
 
 ## 4. App
 ```bash
@@ -32,8 +33,9 @@ flutter create --platforms=android --org com.agnipulse --project-name agni_pulse
 ```
 Then edit what `flutter create` generated:
 * `android/app/build.gradle(.kts)`: `minSdk = 24`.
-* Release builds only: add `<uses-permission android:name="android.permission.INTERNET"/>` to `android/app/src/main/AndroidManifest.xml`
-  (the debug manifest already has it). The plugin declares CAMERA itself.
+* Optional: app name in `android/app/src/main/AndroidManifest.xml` → `android:label="Agni-Pulse"`.
+* Nothing else: the plugin's manifest adds CAMERA **and INTERNET** (release builds need INTERNET; Flutter only adds it
+  to debug builds), and the manifest merger copies both into the app.
 * If Gradle complains about Kotlin/AGP versions, align `ext.kotlin_version` and the AGP classpath in
   `packages/ppg_camera/android/build.gradle` with your project's.
 ```bash
@@ -43,12 +45,16 @@ flutter analyze
 flutter test
 flutter run                      # debug on the phone
 flutter build apk --debug        # build/app/outputs/flutter-apk/app-debug.apk
-flutter build apk --release
+flutter build apk --release --dart-define=API_BASE_URL=https://<your-api>.onrender.com
 ```
+The release APK (`build/app/outputs/flutter-apk/app-release.apk`) can be copied to any phone and installed without a
+cable. It is signed with Flutter's debug key unless you configure your own; fine for a demo, not for the Play Store.
+For cloud hosting and wireless use see **`docs/REMOTE_ACCESS.md`**.
 Kotlin selection tests (no phone needed): `cd android && ./gradlew :ppg_camera:testDebugUnitTest`.
 
 ## 5. First scan
-Home → **Start scan** → grant camera permission. Check the **Camera** card: it shows the camera in use and its frame rate.
+Create an account (or sign in), finish the short onboarding (profile, goals, Prakriti), then Home → **Baseline scan** →
+grant camera permission. Check the **Camera** card: it shows the camera in use and its frame rate.
 If the phone has several back cameras, tap **Change** to try another. Cover the camera **and** the flash with a fingertip.
 
 ## 6. Troubleshooting
@@ -58,4 +64,6 @@ If the phone has several back cameras, tap **Change** to try another. Cover the 
 | Camera card shows a different camera than you want | *Change* → choose it. Unusable cameras are greyed with the reason. |
 | `CAMERA_IN_USE` | Another app holds the camera. Close it and Retry. |
 | Capture status FAIL, "frame rate fluctuates / dropped frames" | Close background apps, let the phone cool, keep the finger still. |
-| "Connection timed out" | Wrong base URL for your setup (see §3). Use *Setup → Save & test connection*. |
+| "Connection timed out" | Wrong server address for your setup (see §3). *Server* → *Save & test connection*. |
+| "Waking up the server…" for ~a minute | Free cloud server was asleep. Normal; it stays awake while in use. |
+| Sent back to the sign-in screen | The session ended (signed out elsewhere, password changed, or account recovered). Sign in again; data is kept. |

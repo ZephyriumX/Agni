@@ -27,8 +27,21 @@ class PpgCameraInfo {
   final String reason; // 'ok' or why it cannot be used
   final Map<String, dynamic> raw;
 
-  PpgCameraInfo._(this.key, this.label, this.kind, this.hasFlash, this.manualSensor, this.meetsMinimum,
-      this.meetsTarget, this.maxFps, this.surfaceMaxFps, this.equivMm, this.mode, this.usableFps, this.reason, this.raw);
+  PpgCameraInfo._(
+      this.key,
+      this.label,
+      this.kind,
+      this.hasFlash,
+      this.manualSensor,
+      this.meetsMinimum,
+      this.meetsTarget,
+      this.maxFps,
+      this.surfaceMaxFps,
+      this.equivMm,
+      this.mode,
+      this.usableFps,
+      this.reason,
+      this.raw);
 
   factory PpgCameraInfo.fromMap(Map m) {
     final key = (m['key'] ?? m['id']).toString();
@@ -101,13 +114,20 @@ class PpgCapabilities {
   factory PpgCapabilities.fromMap(Map m) => PpgCapabilities(
         m['supports60'] == true,
         m['chosen'] == null ? null : Map<String, dynamic>.from(m['chosen']),
-        [for (final c in (m['cameras'] as List)) PpgCameraInfo.fromMap(c as Map)],
-        meetsMinimum: m['meetsMinimum'] as bool?, // absent from older native builds -> falls back to supports60
+        [
+          for (final c in (m['cameras'] as List))
+            PpgCameraInfo.fromMap(c as Map)
+        ],
+        meetsMinimum: m['meetsMinimum']
+            as bool?, // absent from older native builds -> falls back to supports60
         meetsTarget: m['meetsTarget'] as bool?,
         anyMeetsMinimum: m['anyMeetsMinimum'] as bool?,
         platform: (m['platform'] as String?) ?? 'android',
         autoKey: m['autoKey'] as String?,
-        hiddenPhysicalIds: [for (final h in (m['hiddenPhysicalIds'] as List? ?? const [])) h.toString()],
+        hiddenPhysicalIds: [
+          for (final h in (m['hiddenPhysicalIds'] as List? ?? const []))
+            h.toString()
+        ],
         raw: Map<String, dynamic>.from(m),
       );
 
@@ -119,7 +139,8 @@ class PpgCapabilities {
     return null;
   }
 
-  PpgCameraInfo? get chosenCamera => cameraByKey(chosen?['key']?.toString() ?? chosen?['id']?.toString());
+  PpgCameraInfo? get chosenCamera =>
+      cameraByKey(chosen?['key']?.toString() ?? chosen?['id']?.toString());
 
   /// Flash availability of the chosen camera (null if unknown).
   bool? get chosenHasFlash => chosenCamera?.hasFlash;
@@ -130,7 +151,8 @@ class PpgCapabilities {
     b.writeln('platform: $platform  cameras listed: ${cameras.length}'
         '${hiddenPhysicalIds.isEmpty ? '' : '  hidden physical lenses: ${hiddenPhysicalIds.join(', ')}'}');
     for (final c in cameras) {
-      b.writeln('camera ${c.key} [${c.kind}] ${c.label}: flash=${c.hasFlash} manualSensor=${c.manualSensor} '
+      b.writeln(
+          'camera ${c.key} [${c.kind}] ${c.label}: flash=${c.hasFlash} manualSensor=${c.manualSensor} '
           'mode=${c.mode} usableFps=${c.usableFps} yuvMaxFps=${c.maxFps.toStringAsFixed(1)} videoMaxFps=${c.surfaceMaxFps.toStringAsFixed(1)} '
           'aeFps=${c.raw['aeFpsRanges']} highSpeed=${c.raw['highSpeedFpsRanges']} -> ${c.usable ? 'usable' : c.reason}');
     }
@@ -146,7 +168,8 @@ class PpgBatch {
   final Float64List frames;
   final int exposureNs, iso, frameDurationNs;
   final bool manual, locked;
-  PpgBatch(this.frames, this.exposureNs, this.iso, this.frameDurationNs, this.manual, this.locked);
+  PpgBatch(this.frames, this.exposureNs, this.iso, this.frameDurationNs,
+      this.manual, this.locked);
   int get count => frames.length ~/ 6;
 }
 
@@ -156,7 +179,8 @@ class PpgCamera {
 
   /// [targetFps] / [minFps] come from the app's capture config (see app/lib/capture_validation.dart);
   /// the native side holds no thresholds of its own. [cameraKey] selects one camera (null = automatic).
-  static Future<PpgCapabilities> capabilities({int targetFps = 60, int minFps = 55, String? cameraKey}) async =>
+  static Future<PpgCapabilities> capabilities(
+          {int targetFps = 60, int minFps = 55, String? cameraKey}) async =>
       PpgCapabilities.fromMap(await _m.invokeMethod('capabilities', {
         'targetFps': targetFps,
         'minFps': minFps,
@@ -165,7 +189,8 @@ class PpgCamera {
 
   /// Listen to [batches] BEFORE calling start. Throws PlatformException(code: FPS_UNSUPPORTED |
   /// CAMERA_UNSUITABLE | NO_PERMISSION | CAMERA_IN_USE | OPEN_FAILED | SESSION_FAILED).
-  static Future<Map<String, dynamic>> start({int targetFps = 60, int minFps = 55, String? cameraKey}) async =>
+  static Future<Map<String, dynamic>> start(
+          {int targetFps = 60, int minFps = 55, String? cameraKey}) async =>
       Map<String, dynamic>.from(await _m.invokeMethod('start', {
         'targetFps': targetFps,
         'minFps': minFps,
@@ -177,13 +202,17 @@ class PpgCamera {
   static Future<bool> requestCameraPermission() async =>
       (await _m.invokeMethod('requestPermission')) == true;
 
-  static Future<void> setExposureLock(bool locked) => _m.invokeMethod('setExposureLock', {'locked': locked});
+  static Future<void> setExposureLock(bool locked) =>
+      _m.invokeMethod('setExposureLock', {'locked': locked});
   static Future<void> stop() => _m.invokeMethod('stop');
 
   /// Step-by-step log of the running capture session (empty when none). For "Copy diagnostics".
   static Future<List<String>> diagnostics() async {
     try {
-      return ((await _m.invokeMethod('diagnostics')) as List?)?.map((e) => e.toString()).toList() ?? const [];
+      return ((await _m.invokeMethod('diagnostics')) as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [];
     } on MissingPluginException {
       return const [];
     }
@@ -191,7 +220,12 @@ class PpgCamera {
 
   static Stream<PpgBatch> get batches => _e.receiveBroadcastStream().map((o) {
         final m = o as Map;
-        return PpgBatch(m['frames'] as Float64List, (m['exposureNs'] as num).toInt(), (m['iso'] as num).toInt(),
-            (m['frameDurationNs'] as num).toInt(), m['manual'] == true, m['locked'] == true);
+        return PpgBatch(
+            m['frames'] as Float64List,
+            (m['exposureNs'] as num).toInt(),
+            (m['iso'] as num).toInt(),
+            (m['frameDurationNs'] as num).toInt(),
+            m['manual'] == true,
+            m['locked'] == true);
       });
 }

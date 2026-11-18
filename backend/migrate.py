@@ -15,7 +15,7 @@ MIG_DIR = next((p for p in (pathlib.Path(__file__).resolve().parent.parent / "db
 
 def migrate(dsn: str, quiet: bool = False) -> list[str]:
     applied = []
-    with psycopg.connect(dsn, autocommit=False) as conn:
+    with psycopg.connect(dsn, autocommit=False, prepare_threshold=None, connect_timeout=15) as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations ("
                      "name TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ DEFAULT NOW())")
         conn.commit()

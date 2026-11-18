@@ -1,0 +1,31 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Dashboard -> New -> Blueprint -> pick this repository. You are asked for the values marked sync:false.
+services:
+  - type: web
+    name: agni-pulse-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free            # free instances sleep after ~15 min idle; the first request then takes ~30-60 s
+    region: singapore     # closest Render region to India
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: AGNI_ENV
+        value: production
+      - key: AGNI_AUTH_MODE
+        value: token
+      - key: DATABASE_URL          # Supabase -> Connect -> Session pooler URI (port 5432), ?sslmode=require
+        sync: false
+      - key: AGNI_REGISTRATION_KEY # optional: only people who know it can create accounts
+        sync: false
+      - key: AGNI_SMTP_HOST        # optional: e-mailed password-reset codes (recovery codes work without)
+        sync: false
+      - key: AGNI_SMTP_PORT
+        value: "587"
+      - key: AGNI_SMTP_USER
+        sync: false
+      - key: AGNI_SMTP_PASSWORD
+        sync: false
+      - key: AGNI_SMTP_FROM
+        sync: false

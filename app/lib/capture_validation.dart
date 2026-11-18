@@ -59,7 +59,8 @@ class CaptureConfig {
 
   /// Parses GET /api/v1/capture-config. Unknown/missing keys fall back to the defaults.
   factory CaptureConfig.fromJson(Map<String, dynamic> j) {
-    double g(String k, double d) => (j[k] is num) ? (j[k] as num).toDouble() : d;
+    double g(String k, double d) =>
+        (j[k] is num) ? (j[k] as num).toDouble() : d;
     const d = CaptureConfig.defaults;
     return CaptureConfig(
       targetFps: g('target_fps', d.targetFps),
@@ -73,8 +74,10 @@ class CaptureConfig {
       passMaxJitterCv: g('pass_max_jitter_cv', d.passMaxJitterCv),
       hardMaxJitterCv: g('hard_max_jitter_cv', d.hardMaxJitterCv),
       windowS: g('window_s', d.windowS),
-      passMaxLowWindowFraction: g('pass_max_low_window_fraction', d.passMaxLowWindowFraction),
-      hardMaxLowWindowFraction: g('hard_max_low_window_fraction', d.hardMaxLowWindowFraction),
+      passMaxLowWindowFraction:
+          g('pass_max_low_window_fraction', d.passMaxLowWindowFraction),
+      hardMaxLowWindowFraction:
+          g('hard_max_low_window_fraction', d.hardMaxLowWindowFraction),
       minDurationS: g('min_duration_s', d.minDurationS),
       recommendedDurationS: g('recommended_duration_s', d.recommendedDurationS),
       maxPlausibleFps: g('max_plausible_fps', d.maxPlausibleFps),
@@ -160,12 +163,15 @@ CaptureReport _failed(String code, String msg, {int n = 0}) => CaptureReport(
     nSamples: n);
 
 /// Judges a capture from its sensor timestamps (seconds). Mirrors evaluate_timestamps() in Python.
-CaptureReport evaluateTimestamps(List<double> t, [CaptureConfig cfg = CaptureConfig.defaults]) {
+CaptureReport evaluateTimestamps(List<double> t,
+    [CaptureConfig cfg = CaptureConfig.defaults]) {
   if (t.length < 10) {
-    return _failed('timestamps_missing', 'Timestamps are missing or too few to measure frame timing.');
+    return _failed('timestamps_missing',
+        'Timestamps are missing or too few to measure frame timing.');
   }
   if (t.any((x) => !x.isFinite)) {
-    return _failed('timestamps_invalid', 'Timestamps contain invalid (NaN/infinite) values.');
+    return _failed('timestamps_invalid',
+        'Timestamps contain invalid (NaN/infinite) values.');
   }
   final dt = <double>[for (var i = 1; i < t.length; i++) t[i] - t[i - 1]];
   final bad = dt.where((d) => d <= 0).length;
@@ -200,7 +206,8 @@ CaptureReport evaluateTimestamps(List<double> t, [CaptureConfig cfg = CaptureCon
   if (duration >= win) {
     final stop = t.last - win + 1e-9;
     final step = win / 2.0;
-    final slack = math.max(cfg.fpsTolerance, 1.0 / win); // a window holds whole frames: resolves to 1/window_s
+    final slack = math.max(cfg.fpsTolerance,
+        1.0 / win); // a window holds whole frames: resolves to 1/window_s
     minWin = double.infinity;
     for (var k = 0;; k++) {
       final s = t.first + k * step;
@@ -214,29 +221,36 @@ CaptureReport evaluateTimestamps(List<double> t, [CaptureConfig cfg = CaptureCon
   final lowFrac = nWin > 0 ? low / nWin : 0.0;
 
   final reasons = <CaptureReason>[];
-  void add(String c, CaptureStatus s, String m) => reasons.add(CaptureReason(c, s, m));
+  void add(String c, CaptureStatus s, String m) =>
+      reasons.add(CaptureReason(c, s, m));
   final eff = math.min(fsMean, fsMedian) + cfg.fpsTolerance;
   final rawEff = math.min(fsMean, fsMedian);
   if (eff < cfg.hardMinFps) {
     add('fps_too_low', CaptureStatus.fail,
         'Camera delivered ${rawEff.toStringAsFixed(1)} fps, below the ${cfg.hardMinFps.toStringAsFixed(0)} fps minimum.');
   } else if (eff < cfg.preferredMinFps) {
-    add('fps_below_preferred', CaptureStatus.warning,
+    add(
+        'fps_below_preferred',
+        CaptureStatus.warning,
         'Camera delivered ${rawEff.toStringAsFixed(1)} fps (preferred ${cfg.preferredMinFps.toStringAsFixed(0)}+, '
-        'minimum ${cfg.hardMinFps.toStringAsFixed(0)}).');
+            'minimum ${cfg.hardMinFps.toStringAsFixed(0)}).');
   }
   if (dropRatio > cfg.hardMaxDropRatio) {
     add('too_many_drops', CaptureStatus.fail,
         '${_pct(dropRatio)} of frames were dropped (limit ${_pct(cfg.hardMaxDropRatio, 0)}).');
   } else if (dropRatio > cfg.passMaxDropRatio) {
-    add('some_drops', CaptureStatus.warning, '${_pct(dropRatio)} of frames were dropped.');
+    add('some_drops', CaptureStatus.warning,
+        '${_pct(dropRatio)} of frames were dropped.');
   }
   if (maxGap > cfg.hardMaxGapS) {
-    add('long_gap', CaptureStatus.fail,
+    add(
+        'long_gap',
+        CaptureStatus.fail,
         'Longest gap between frames was ${(maxGap * 1000).toStringAsFixed(0)} ms '
-        '(limit ${(cfg.hardMaxGapS * 1000).toStringAsFixed(0)} ms).');
+            '(limit ${(cfg.hardMaxGapS * 1000).toStringAsFixed(0)} ms).');
   } else if (maxGap > cfg.passMaxGapS) {
-    add('gap', CaptureStatus.warning, 'Longest gap between frames was ${(maxGap * 1000).toStringAsFixed(0)} ms.');
+    add('gap', CaptureStatus.warning,
+        'Longest gap between frames was ${(maxGap * 1000).toStringAsFixed(0)} ms.');
   }
   if (jitterCv > cfg.hardMaxJitterCv) {
     add('unstable_intervals', CaptureStatus.fail,
@@ -246,13 +260,17 @@ CaptureReport evaluateTimestamps(List<double> t, [CaptureConfig cfg = CaptureCon
         'Frame intervals are somewhat irregular (variability ${_pct(jitterCv, 0)}).');
   }
   if (lowFrac > cfg.hardMaxLowWindowFraction) {
-    add('fps_fluctuates', CaptureStatus.fail,
+    add(
+        'fps_fluctuates',
+        CaptureStatus.fail,
         'Frame rate dropped below ${cfg.hardMinFps.toStringAsFixed(0)} fps for ${_pct(lowFrac, 0)} of the recording '
-        '(lowest ${minWin.toStringAsFixed(0)} fps over ${cfg.windowS.toStringAsFixed(0)} s).');
+            '(lowest ${minWin.toStringAsFixed(0)} fps over ${cfg.windowS.toStringAsFixed(0)} s).');
   } else if (lowFrac > cfg.passMaxLowWindowFraction) {
-    add('fps_dips', CaptureStatus.warning,
+    add(
+        'fps_dips',
+        CaptureStatus.warning,
         'Frame rate briefly dipped below ${cfg.hardMinFps.toStringAsFixed(0)} fps '
-        '(lowest ${minWin.toStringAsFixed(0)} fps over ${cfg.windowS.toStringAsFixed(0)} s).');
+            '(lowest ${minWin.toStringAsFixed(0)} fps over ${cfg.windowS.toStringAsFixed(0)} s).');
   }
   if (duration < cfg.minDurationS) {
     add('too_short', CaptureStatus.fail,
@@ -287,5 +305,7 @@ CaptureReport evaluateTimestamps(List<double> t, [CaptureConfig cfg = CaptureCon
 /// A timing PASS never rescues a failed SQI. Unverified timing (null) is never a plain PASS.
 CaptureStatus combineStatus(CaptureStatus? timing, bool sqiPassed) {
   if (!sqiPassed || timing == CaptureStatus.fail) return CaptureStatus.fail;
-  return timing == CaptureStatus.pass ? CaptureStatus.pass : CaptureStatus.warning;
+  return timing == CaptureStatus.pass
+      ? CaptureStatus.pass
+      : CaptureStatus.warning;
 }

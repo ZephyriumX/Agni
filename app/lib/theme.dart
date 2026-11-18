@@ -9,7 +9,8 @@ class Brand {
 }
 
 ThemeData buildTheme(Brightness brightness) {
-  final scheme = ColorScheme.fromSeed(seedColor: Brand.ember, brightness: brightness);
+  final scheme =
+      ColorScheme.fromSeed(seedColor: Brand.ember, brightness: brightness);
   final base = ThemeData(useMaterial3: true, colorScheme: scheme);
   final r14 = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
   return base.copyWith(
@@ -20,7 +21,8 @@ ThemeData buildTheme(Brightness brightness) {
       scrolledUnderElevation: 0,
       backgroundColor: scheme.surface,
       foregroundColor: scheme.onSurface,
-      titleTextStyle: TextStyle(color: scheme.onSurface, fontSize: 20, fontWeight: FontWeight.w700),
+      titleTextStyle: TextStyle(
+          color: scheme.onSurface, fontSize: 20, fontWeight: FontWeight.w700),
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -33,7 +35,8 @@ ThemeData buildTheme(Brightness brightness) {
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), shape: r14),
+      style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48), shape: r14),
     ),
     navigationBarTheme: const NavigationBarThemeData(
       height: 68,
@@ -53,20 +56,28 @@ class StatusStyle {
     switch (s) {
       case CaptureStatus.pass:
         return dark
-            ? const StatusStyle(Color(0xFF1B3A1F), Color(0xFF9BE3A0), Icons.check_circle)
-            : const StatusStyle(Color(0xFFE3F4E4), Color(0xFF1B5E20), Icons.check_circle);
+            ? const StatusStyle(
+                Color(0xFF1B3A1F), Color(0xFF9BE3A0), Icons.check_circle)
+            : const StatusStyle(
+                Color(0xFFE3F4E4), Color(0xFF1B5E20), Icons.check_circle);
       case CaptureStatus.warning:
         return dark
-            ? const StatusStyle(Color(0xFF3D3214), Color(0xFFFFD36B), Icons.warning_amber_rounded)
-            : const StatusStyle(Color(0xFFFFF3D6), Color(0xFF8A5A00), Icons.warning_amber_rounded);
+            ? const StatusStyle(Color(0xFF3D3214), Color(0xFFFFD36B),
+                Icons.warning_amber_rounded)
+            : const StatusStyle(Color(0xFFFFF3D6), Color(0xFF8A5A00),
+                Icons.warning_amber_rounded);
       case CaptureStatus.fail:
         return dark
-            ? const StatusStyle(Color(0xFF3F1A1A), Color(0xFFFFA8A8), Icons.cancel)
-            : const StatusStyle(Color(0xFFFDE4E4), Color(0xFF9C1C1C), Icons.cancel);
+            ? const StatusStyle(
+                Color(0xFF3F1A1A), Color(0xFFFFA8A8), Icons.cancel)
+            : const StatusStyle(
+                Color(0xFFFDE4E4), Color(0xFF9C1C1C), Icons.cancel);
       case null:
         return dark
-            ? const StatusStyle(Color(0xFF2B2B2B), Color(0xFFCFCFCF), Icons.radio_button_unchecked)
-            : const StatusStyle(Color(0xFFEDEDED), Color(0xFF555555), Icons.radio_button_unchecked);
+            ? const StatusStyle(Color(0xFF2B2B2B), Color(0xFFCFCFCF),
+                Icons.radio_button_unchecked)
+            : const StatusStyle(Color(0xFFEDEDED), Color(0xFF555555),
+                Icons.radio_button_unchecked);
     }
   }
 }

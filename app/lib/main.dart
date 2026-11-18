@@ -1,22 +1,23 @@
-import 'about_screen.dart';
-import 'config.dart';
-import 'onboarding.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'capture_validation.dart';
+import 'auth_screens.dart';
 import 'config.dart';
 import 'diary_screen.dart';
-import 'pending_queue.dart';
-import 'quiz_screen.dart';
-import 'report_screen.dart';
+import 'history_screen.dart';
+import 'home_screen.dart';
+import 'insights_screen.dart';
+import 'onboarding.dart';
+import 'profile_screen.dart';
 import 'scan_screen.dart';
-import 'settings_screen.dart';
+import 'server_settings_screen.dart';
+import 'session.dart';
 import 'theme.dart';
-import 'timer_screen.dart';
-import 'widgets.dart';
 
-void main() => runApp(const AgniPulseApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const AgniPulseApp());
+}
 
 class AgniPulseApp extends StatelessWidget {
   const AgniPulseApp({super.key});
@@ -27,39 +28,154 @@ class AgniPulseApp extends StatelessWidget {
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: ThemeMode.system,
-        home: const _Gate(),
+        home: const RootGate(),
       );
 }
 
-/// Shows the one-time health disclaimer before the app.
-class _Gate extends StatefulWidget {
-  const _Gate();
+/// Decides what the user sees: sign-in, legacy upgrade, onboarding, or the app. Rebuilds whenever the
+/// session changes (sign-in, sign-out, onboarding finished, session expired on the server).
+class RootGate extends StatefulWidget {
+  const RootGate({super.key});
   @override
-  State<_Gate> createState() => _GateState();
+  State<RootGate> createState() => _RootGateState();
 }
 
-class _GateState extends State<_Gate> {
-  bool? _ok;
+class _RootGateState extends State<RootGate> {
+  final _session = Session.instance;
+  bool _booting = true;
+  Object? _bootError;
+  bool _skipUpgrade = false;
+
   @override
   void initState() {
     super.initState();
-    AppConfig.onboarded().then((v) { if (mounted) setState(() => _ok = v); });
+    _session.addListener(_changed);
+    _boot();
+  }
+
+  @override
+  void dispose() {
+    _session.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _boot() async {
+    setState(() {
+      _booting = true;
+      _bootError = null;
+    });
+    try {
+      if (await AppConfig.token() != null)
+        await Api.wake(); // a sleeping cloud server needs time
+      await _session.restore();
+    } on ApiError catch (e) {
+      // Signed in but the server cannot be reached: keep the login and offer retry / offline scanning.
+      if (e.kind != ApiErrorKind.unauthorized) _bootError = e;
+    } catch (e) {
+      _bootError = e;
+    }
+    if (mounted) setState(() => _booting = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_ok == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_ok == false) {
-      return OnboardingScreen(onAccept: () async {
-        await AppConfig.setOnboarded();
-        if (mounted) setState(() => _ok = true);
-      });
+    if (_booting) return const _Splash();
+    if (_bootError != null) {
+      return _Offline(
+        error: _bootError!,
+        onRetry: _boot,
+        onOffline: () => setState(() {
+          _bootError = null;
+          _session.signedIn =
+              true; // cached token: scans are queued and uploaded later
+        }),
+      );
     }
+    if (!_session.signedIn) return const WelcomeScreen();
+    if (_session.legacy && !_skipUpgrade) {
+      return UpgradeAccountScreen(
+          onSkip: () => setState(() => _skipUpgrade = true));
+    }
+    if (_session.user != null && !_session.onboarded)
+      return const OnboardingFlow();
     return const AppShell();
   }
 }
 
-/// Bottom navigation: Home / Report / Diary / Settings.
+class _Splash extends StatelessWidget {
+  const _Splash();
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.local_fire_department, size: 64, color: cs.primary),
+          const SizedBox(height: 16),
+          const Text('Agni-Pulse',
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 24),
+          const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 3)),
+          const SizedBox(height: 12),
+          Text('Connecting to your server…',
+              style: TextStyle(color: cs.onSurfaceVariant)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _Offline extends StatelessWidget {
+  final Object error;
+  final VoidCallback onRetry, onOffline;
+  const _Offline(
+      {required this.error, required this.onRetry, required this.onOffline});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(
+          child: ListView(padding: const EdgeInsets.all(24), children: [
+            const SizedBox(height: 24),
+            Icon(Icons.cloud_off,
+                size: 56, color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 12),
+            Text("Can't reach your server",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 12),
+            SelectableText('$error', textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try again')),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.dns_outlined),
+              label: const Text('Server settings'),
+              onPressed: () async {
+                await Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ServerSettingsScreen()));
+                onRetry();
+              },
+            ),
+            TextButton(
+                onPressed: onOffline,
+                child: const Text('Continue offline (scans upload later)')),
+          ]),
+        ),
+      );
+}
+
+/// Bottom navigation: Home · Insights · History · Diary · Profile. Tabs are built when first opened and kept.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
   @override
@@ -68,199 +184,70 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _tab = 0;
+  final _visited = <int>{0};
+  final _keys = List.generate(5, (_) => UniqueKey());
+
+  void _open(int i) => setState(() {
+        _tab = i;
+        _visited.add(i);
+      });
+
+  /// After a scan, data on every tab may have changed: rebuild the visited ones.
+  void refreshAll() => setState(() {
+        for (var i = 0; i < _keys.length; i++) {
+          if (i != _tab) _keys[i] = UniqueKey();
+        }
+      });
+
+  Future<void> _scan([String tag = 'Baseline']) async {
+    await Navigator.push<Object?>(context,
+        MaterialPageRoute(builder: (_) => ScanScreen(initialTag: tag)));
+    refreshAll();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[
-      HomeScreen(onOpenTab: (i) => setState(() => _tab = i)),
-      if (_tab == 1) const ReportScreen() else const SizedBox.shrink(),
-      if (_tab == 2) const DiaryScreen() else const SizedBox.shrink(),
-      if (_tab == 3) const SettingsScreen() else const SizedBox.shrink(),
-      if (_tab == 4) const AboutScreen() else const SizedBox.shrink(),
-    ];
+    Widget page(int i, Widget w) => _visited.contains(i)
+        ? KeyedSubtree(key: _keys[i], child: w)
+        : const SizedBox.shrink();
     return Scaffold(
-      body: IndexedStack(index: _tab, children: pages),
+      body: IndexedStack(index: _tab, children: [
+        page(0, HomeScreen(onOpenTab: _open, onDataChanged: refreshAll)),
+        page(1, InsightsScreen(onStartScan: () => _scan())),
+        page(2, HistoryScreen(onStartScan: () => _scan())),
+        page(3, const DiaryScreen()),
+        page(4, const ProfileScreen()),
+      ]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        onDestinationSelected: (i) {
+          if (i == _tab && i != 0) {
+            setState(() => _keys[i] = UniqueKey()); // tap again = refresh
+          }
+          _open(i);
+        },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Report'),
-          NavigationDestination(icon: Icon(Icons.restaurant_outlined), selectedIcon: Icon(Icons.restaurant), label: 'Diary'),
-          NavigationDestination(icon: Icon(Icons.tune), selectedIcon: Icon(Icons.tune), label: 'Setup'),
-          NavigationDestination(icon: Icon(Icons.info_outline), selectedIcon: Icon(Icons.info), label: 'About'),
+          NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home'),
+          NavigationDestination(
+              icon: Icon(Icons.insights_outlined),
+              selectedIcon: Icon(Icons.insights),
+              label: 'Insights'),
+          NavigationDestination(
+              icon: Icon(Icons.history),
+              selectedIcon: Icon(Icons.history_toggle_off),
+              label: 'History'),
+          NavigationDestination(
+              icon: Icon(Icons.restaurant_outlined),
+              selectedIcon: Icon(Icons.restaurant),
+              label: 'Diary'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profile'),
         ],
-      ),
-    );
-  }
-}
-
-class HomeScreen extends StatefulWidget {
-  final void Function(int tab) onOpenTab;
-  const HomeScreen({super.key, required this.onOpenTab});
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  bool _checking = true;
-  bool _serverOk = false;
-  String _serverMsg = 'Checking server…';
-  int _pending = 0;
-  String? _prakriti;
-  Map<String, dynamic>? _last; // most recent scan summary from the server
-
-  @override
-  void initState() {
-    super.initState();
-    _refresh();
-  }
-
-  Future<void> _refresh() async {
-    if (mounted) setState(() => _checking = true);
-    final steps = await Api.diagnose();
-    final bad = steps.where((s) => !s.ok).toList();
-    var pending = await PendingQueue.count();
-    if (bad.isEmpty && pending > 0) {
-      await PendingQueue.flush();
-      pending = await PendingQueue.count();
-    }
-    String? pr;
-    Map<String, dynamic>? last;
-    if (bad.isEmpty) {
-      try {
-        pr = (await Api.me())['prakriti_type'] as String?;
-        final rep = await Api.report();
-        final scans = (rep['scans'] as List?) ?? const [];
-        if (scans.isNotEmpty) last = Map<String, dynamic>.from(scans.last as Map);
-      } on ApiError catch (_) {}
-    }
-    if (!mounted) return;
-    setState(() {
-      _checking = false;
-      _pending = pending;
-      _prakriti = pr;
-      _last = last;
-      _serverOk = bad.isEmpty;
-      _serverMsg = bad.isEmpty ? 'Server connected' : '${bad.first.name}: tap to fix';
-    });
-  }
-
-  Future<void> _go(Widget w) async {
-    final r = await Navigator.push<Object?>(context, MaterialPageRoute<Object?>(builder: (_) => w));
-    if (r is Map && r['vajrasana_for'] != null && mounted) {
-      await Navigator.push(
-          context, MaterialPageRoute<void>(builder: (_) => TimerScreen(preScanId: r['vajrasana_for'] as String)));
-    }
-    _refresh();
-  }
-
-  String _n(dynamic v, [int d = 1]) => v == null ? '—' : (v as num).toStringAsFixed(d);
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(children: [
-          Icon(Icons.local_fire_department, color: cs.primary),
-          const SizedBox(width: 8),
-          const Text('Agni-Pulse'),
-        ]),
-        actions: [IconButton(icon: const Icon(Icons.refresh), tooltip: 'Refresh', onPressed: _refresh)],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: GestureDetector(
-              onTap: () => widget.onOpenTab(3),
-              child: StatusPill(
-                status: _checking ? null : (_serverOk ? CaptureStatus.pass : CaptureStatus.fail),
-                label: _checking ? 'Checking server…' : _serverMsg,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_pending > 0)
-            InfoBanner(
-              tone: CaptureStatus.warning,
-              icon: Icons.cloud_upload_outlined,
-              text: '$_pending scan(s) saved on this phone, waiting to upload.',
-              action: TextButton(onPressed: _refresh, child: const Text('Retry now')),
-            ),
-          // ---- hero
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [cs.primary, cs.tertiary],
-              ),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Check your vascular tone', style: tt.headlineSmall?.copyWith(color: cs.onPrimary, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 6),
-              Text('A 35-second fingertip scan with your phone camera and flash.',
-                  style: tt.bodyMedium?.copyWith(color: cs.onPrimary.withAlpha(230))),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: cs.onPrimary, foregroundColor: cs.primary),
-                icon: const Icon(Icons.favorite),
-                label: const Text('Start scan'),
-                onPressed: () => _go(const ScanScreen()),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          // ---- last scan
-          if (_last != null)
-            SectionCard(
-              title: 'Last scan',
-              icon: Icons.history,
-              trailing: StatusPill(
-                status: _last!['sqi_passed'] == true ? CaptureStatus.pass : CaptureStatus.warning,
-                label: _last!['sqi_passed'] == true ? 'Good quality' : 'Poor quality',
-              ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${_last!['tag_event'] ?? ''}', style: tt.labelLarge),
-                const SizedBox(height: 10),
-                Wrap(spacing: 10, runSpacing: 10, children: [
-                  MetricTile(label: 'b/a ratio', value: _n(_last!['ba_ratio'], 2), hint: 'more negative = more compliant'),
-                  MetricTile(label: 'RMSSD', value: _n(_last!['rmssd']), unit: 'ms'),
-                  MetricTile(label: 'Heart rate', value: _n(_last!['avg_bpm'], 0), unit: 'bpm'),
-                ]),
-              ]),
-            ),
-          // ---- journey
-          SectionCard(
-            title: 'Your scan journey',
-            icon: Icons.route,
-            child: const Column(children: [
-              StepRow(n: 1, text: 'Baseline: rested, seated, ideally in the morning.'),
-              StepRow(n: 2, text: 'Post-meal: scan about 30 minutes after eating.'),
-              StepRow(n: 3, text: 'Post-Vajrasana: scan again after 10 minutes of Vajrasana.'),
-            ]),
-          ),
-          if (_prakriti == null)
-            SectionCard(
-              title: 'Personalise',
-              icon: Icons.spa,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('A 1-minute Prakriti quiz tailors the guidance to you.'),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(icon: const Icon(Icons.spa), label: const Text('Take the quiz'), onPressed: () => _go(const QuizScreen())),
-              ]),
-            )
-          else
-            SectionCard(title: 'Prakriti', icon: Icons.spa, child: Text(_prakriti!, style: tt.titleLarge)),
-          const SizedBox(height: 4),
-          Text('Wellness tool, not a medical device.', textAlign: TextAlign.center, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-        ]),
       ),
     );
   }

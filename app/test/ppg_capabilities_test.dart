@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ppg_camera/ppg_camera.dart';
 
-Map<String, dynamic> cam(String key, double fps, {bool flash = true, double video = 0, String kind = 'single'}) => {
+Map<String, dynamic> cam(String key, double fps,
+        {bool flash = true, double video = 0, String kind = 'single'}) =>
+    {
       'key': key,
       'id': key,
       'label': 'Camera $key',
@@ -12,7 +14,11 @@ Map<String, dynamic> cam(String key, double fps, {bool flash = true, double vide
       'surfaceMaxFps': video,
       'meetsMinimum': flash && fps >= 54.5,
       'meetsTarget': flash && fps >= 59.5,
-      'reason': !flash ? 'no flash/torch' : (fps >= 54.5 ? 'ok' : 'streams at most ${fps.round()} fps to apps (needs 55)'),
+      'reason': !flash
+          ? 'no flash/torch'
+          : (fps >= 54.5
+              ? 'ok'
+              : 'streams at most ${fps.round()} fps to apps (needs 55)'),
       'aeFpsRanges': [
         [10, 30]
       ],
@@ -23,14 +29,26 @@ void main() {
   test('lists logical and physical cameras with their own fps and reasons', () {
     final caps = PpgCapabilities.fromMap({
       'platform': 'android',
-      'cameras': [cam('0', 30, kind: 'logical'), cam('0:2', 60, kind: 'physical'), cam('0:3', 30, flash: false, kind: 'physical')],
+      'cameras': [
+        cam('0', 30, kind: 'logical'),
+        cam('0:2', 60, kind: 'physical'),
+        cam('0:3', 30, flash: false, kind: 'physical')
+      ],
       'autoKey': '0:2',
       'meetsMinimum': true,
       'meetsTarget': true,
       'anyMeetsMinimum': true,
       'supports60': true,
       'hiddenPhysicalIds': ['0:4'],
-      'chosen': {'key': '0:2', 'id': '0:2', 'label': 'Camera 0:2', 'w': 640, 'h': 480, 'maxFps': 60.0, 'manual': true},
+      'chosen': {
+        'key': '0:2',
+        'id': '0:2',
+        'label': 'Camera 0:2',
+        'w': 640,
+        'h': 480,
+        'maxFps': 60.0,
+        'manual': true
+      },
     });
     expect(caps.cameras.length, 3);
     expect(caps.autoKey, '0:2');
@@ -64,7 +82,13 @@ void main() {
     final caps = PpgCapabilities.fromMap({
       'supports60': true,
       'cameras': [
-        {'id': '0', 'hasFlash': true, 'manualSensor': true, 'maxYuvFps': 60.0, 'aeFpsRanges': []}
+        {
+          'id': '0',
+          'hasFlash': true,
+          'manualSensor': true,
+          'maxYuvFps': 60.0,
+          'aeFpsRanges': []
+        }
       ],
       'chosen': {'id': '0', 'w': 320, 'h': 240, 'maxFps': 60.0, 'manual': true},
     });

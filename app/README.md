@@ -15,7 +15,21 @@ flutter run
 ```
 
 ## Screens
-Home dashboard (server status, last scan, scan journey, pending uploads) · Scan (camera card with selector, guided steps,
-finger detection, live PPG/APG, 35 s recording with sensor timestamps, on-device timing verdict, upload, result with
-comparison) · Vajrasana timer + before/after · Report · Food diary · Prakriti quiz · Setup (server, camera, capture rules).
-A scan that cannot be uploaded is saved on the phone and retried (idempotent).
+* **Welcome / sign-up / sign-in / reset password** (recovery code, or e-mail code when the server has SMTP), server settings
+  before sign-in, upgrade of v0.x device profiles.
+* **Onboarding**: about you → goals → 12-question Prakriti → result. Editable later in Profile.
+* **Home**: greeting, baseline progress, quick actions (after meal, after practice, guided Vajrasana, compare), latest
+  insights, last scan vs baseline, pending uploads.
+* **Scan**: camera card with selector (incl. high-speed mode), guided steps, finger detection, live PPG/APG, 35 s
+  recording with sensor timestamps, on-device timing verdict, scan type / meal / practice / context / note, upload,
+  result with comparison. Unsent scans are kept on the phone and retried (idempotent).
+* **Insights**: period selector, overview, insights with confidence, normal range, trend chart with normal band, scans
+  vs baseline, meal ranking and descriptors, interventions, situations, time of day, signal quality, Prakriti
+  guidance, "How to read this".
+* **History** (filters, grouped by day) → **Scan details** (metrics, average beat, comparisons, quality, delete) →
+  **Compare** any two scans.
+* **Diary**: log meals, ranked meals, scan after a meal.
+* **Profile**: personalisation, security (password, recovery code, devices, sign out everywhere), server & camera,
+  how it works, delete account.
+
+Wireless use: build with `--dart-define=API_BASE_URL=https://<your-api>` (see `../docs/REMOTE_ACCESS.md`).

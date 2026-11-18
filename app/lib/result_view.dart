@@ -3,9 +3,11 @@ import 'capture_validation.dart';
 import 'waveform.dart';
 import 'widgets.dart';
 
-String _f(dynamic v, [int d = 1]) => v == null ? '—' : (v as num).toStringAsFixed(d);
+String _f(dynamic v, [int d = 1]) =>
+    v == null ? '—' : (v as num).toStringAsFixed(d);
 
-Color gradeColor(String g) => g == 'Good' ? Colors.green : (g == 'Bad' ? Colors.red : Colors.orange);
+Color gradeColor(String g) =>
+    g == 'Good' ? Colors.green : (g == 'Bad' ? Colors.red : Colors.orange);
 
 class ResultView extends StatelessWidget {
   final Map<String, dynamic> result;
@@ -18,10 +20,15 @@ class ResultView extends StatelessWidget {
     final ok = sqi['passed'] == true;
     final reasons = List<String>.from(sqi['reasons'] ?? []);
     final warnings = List<String>.from(result['warnings'] ?? []);
-    final comp = result['comparison'] == null ? null : Map<String, dynamic>.from(result['comparison']);
-    final acq = result['acquisition'] == null ? null : Map<String, dynamic>.from(result['acquisition']);
+    final comp = result['comparison'] == null
+        ? null
+        : Map<String, dynamic>.from(result['comparison']);
+    final acq = result['acquisition'] == null
+        ? null
+        : Map<String, dynamic>.from(result['acquisition']);
     // Final verdict = timing gate AND signal-quality gate (older servers do not send final_status).
-    final fin = statusFromString(result['final_status'] as String?) ?? (ok ? CaptureStatus.pass : CaptureStatus.fail);
+    final fin = statusFromString(result['final_status'] as String?) ??
+        (ok ? CaptureStatus.pass : CaptureStatus.fail);
     final finLabel = switch (fin) {
       CaptureStatus.pass => 'Scan accepted',
       CaptureStatus.warning => 'Accepted with minor frame-rate variation',
@@ -29,26 +36,48 @@ class ResultView extends StatelessWidget {
     };
     final cs = Theme.of(context).colorScheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (result['duplicate'] == true) const InfoBanner(icon: Icons.copy, text: 'Already saved: duplicate upload ignored.'),
+      if (result['duplicate'] == true)
+        const InfoBanner(
+            icon: Icons.copy, text: 'Already saved: duplicate upload ignored.'),
       InfoBanner(tone: fin, text: finLabel),
       if (ok)
         SectionCard(
           title: 'Your results',
           icon: Icons.monitor_heart,
           child: Wrap(spacing: 10, runSpacing: 10, children: [
-            MetricTile(label: 'b/a (vascular)', value: _f(result['ba_ratio'], 2), hint: 'more negative = more compliant'),
-            MetricTile(label: 'RMSSD', value: _f(result['rmssd_ms']), unit: 'ms', hint: 'autonomic stress'),
-            MetricTile(label: 'Heart rate', value: _f(result['avg_bpm'], 0), unit: 'bpm'),
-            MetricTile(label: 'd/a', value: _f(result['da_ratio'], 2), hint: 'experimental'),
+            MetricTile(
+                label: 'b/a (vascular)',
+                value: _f(result['ba_ratio'], 2),
+                hint: 'more negative = more compliant'),
+            MetricTile(
+                label: 'RMSSD',
+                value: _f(result['rmssd_ms']),
+                unit: 'ms',
+                hint: 'autonomic stress'),
+            MetricTile(
+                label: 'Heart rate',
+                value: _f(result['avg_bpm'], 0),
+                unit: 'bpm'),
+            MetricTile(
+                label: 'd/a',
+                value: _f(result['da_ratio'], 2),
+                hint: 'experimental'),
           ]),
         ),
       if (reasons.isNotEmpty || warnings.isNotEmpty)
         SectionCard(
           title: 'Notes',
           icon: Icons.info_outline,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            for (final r in reasons) Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('• $r')),
-            for (final w in warnings) Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('ℹ $w')),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final r in reasons)
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('• $r')),
+            for (final w in warnings)
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('ℹ $w')),
           ]),
         ),
       if (acq != null)
@@ -61,8 +90,11 @@ class ResultView extends StatelessWidget {
               '${acq['status'] != null ? '  ·  timing ${acq['status']}' : ''}',
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
         ),
-      if (comp != null) SectionCard(child: ComparisonCard(comparison: comp, onVajrasana: onVajrasana)),
-      Text(result['disclaimer'] ?? '', style: Theme.of(context).textTheme.bodySmall),
+      if (comp != null)
+        SectionCard(
+            child: ComparisonCard(comparison: comp, onVajrasana: onVajrasana)),
+      Text(result['disclaimer'] ?? '',
+          style: Theme.of(context).textTheme.bodySmall),
     ]);
   }
 }
@@ -75,17 +107,28 @@ class ComparisonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final interp = Map<String, dynamic>.from(comparison['interpretation'] ?? {});
+    final interp =
+        Map<String, dynamic>.from(comparison['interpretation'] ?? {});
     final dials = Map<String, dynamic>.from(interp['dials'] ?? {});
-    final recs = List<Map<String, dynamic>>.from((interp['recommendations'] ?? []).map((e) => Map<String, dynamic>.from(e)));
-    final wantsVajra = recs.any((r) => (r['type'] as String).contains('Vajrasana'));
-    const dialNames = {'metabolic_load': 'Metabolic load', 'digestive_fire': 'Digestive fire', 'stability': 'Stability'};
+    final recs = List<Map<String, dynamic>>.from(
+        (interp['recommendations'] ?? [])
+            .map((e) => Map<String, dynamic>.from(e)));
+    final wantsVajra =
+        recs.any((r) => (r['type'] as String).contains('Vajrasana'));
+    const dialNames = {
+      'metabolic_load': 'Metabolic load',
+      'digestive_fire': 'Digestive fire',
+      'stability': 'Stability'
+    };
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Compared with your reference scan', style: Theme.of(context).textTheme.titleMedium),
+      Text('Compared with your reference scan',
+          style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 4),
-      Text('Compatibility ${_f(comparison['compatibility_pct'], 0)}%  ·  ${comparison['verdict'] ?? ''}',
+      Text(
+          'Compatibility ${_f(comparison['compatibility_pct'], 0)}%  ·  ${comparison['verdict'] ?? ''}',
           style: const TextStyle(fontWeight: FontWeight.bold)),
-      Text('Δ Vascular tone ${_f(comparison['delta_vascular_tone_pct'])} %   ·   HRV ratio ${_f(comparison['hrv_ratio'], 2)}'),
+      Text(
+          'Δ Vascular tone ${_f(comparison['delta_vascular_tone_pct'])} %   ·   HRV ratio ${_f(comparison['hrv_ratio'], 2)}'),
       const SizedBox(height: 8),
       Row(children: [
         for (final e in dialNames.entries)
@@ -97,8 +140,13 @@ class ComparisonCard extends StatelessWidget {
                   padding: const EdgeInsets.all(8),
                   child: Column(children: [
                     Text(e.value, style: const TextStyle(fontSize: 11)),
-                    Text(dials[e.key]['grade'], style: TextStyle(fontWeight: FontWeight.bold, color: gradeColor(dials[e.key]['grade']))),
-                    Text(dials[e.key]['label'] ?? '', style: const TextStyle(fontSize: 10), textAlign: TextAlign.center),
+                    Text(dials[e.key]['grade'],
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: gradeColor(dials[e.key]['grade']))),
+                    Text(dials[e.key]['label'] ?? '',
+                        style: const TextStyle(fontSize: 10),
+                        textAlign: TextAlign.center),
                   ]),
                 ),
               ),
@@ -106,14 +154,19 @@ class ComparisonCard extends StatelessWidget {
       ]),
       for (final f in List<String>.from(interp['findings'] ?? [])) Text('• $f'),
       const SizedBox(height: 8),
-      for (final r in recs) Text('🧘 ${r['type']}: ${r['how']}', style: const TextStyle(fontStyle: FontStyle.italic)),
+      for (final r in recs)
+        Text('🧘 ${r['type']}: ${r['how']}',
+            style: const TextStyle(fontStyle: FontStyle.italic)),
       if (wantsVajra && onVajrasana != null)
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: FilledButton.tonal(onPressed: onVajrasana, child: const Text('Start 10-min Vajrasana timer')),
+          child: FilledButton.tonal(
+              onPressed: onVajrasana,
+              child: const Text('Start 10-min Vajrasana timer')),
         ),
       const SizedBox(height: 4),
-      const Text('Wellness guidance, not medical advice. "Metabolic overload" is an experimental pulse-shape pattern, not a glucose reading.',
+      const Text(
+          'Wellness guidance, not medical advice. "Metabolic overload" is an experimental pulse-shape pattern, not a glucose reading.',
           style: TextStyle(fontSize: 11, color: Colors.grey)),
     ]);
   }
@@ -124,19 +177,28 @@ class BeforeAfterCard extends StatelessWidget {
   final Map<String, dynamic>? before, after;
   const BeforeAfterCard({super.key, this.before, this.after});
 
-  List<double> _apg(Map<String, dynamic>? t) =>
-      t == null ? const [] : List<double>.from((t['apg'] as List).map((e) => (e as num).toDouble()));
+  List<double> _apg(Map<String, dynamic>? t) => t == null
+      ? const []
+      : List<double>.from((t['apg'] as List).map((e) => (e as num).toDouble()));
 
   @override
   Widget build(BuildContext context) {
     final b = _apg(before), a = _apg(after);
     if (b.isEmpty || a.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Before vs after (average APG beat)', style: TextStyle(fontWeight: FontWeight.bold)),
-      SizedBox(height: 140, child: CustomPaint(painter: BeforeAfterPainter(b, a), size: Size.infinite)),
+      const Text('Before vs after (average APG beat)',
+          style: TextStyle(fontWeight: FontWeight.bold)),
+      SizedBox(
+          height: 140,
+          child: CustomPaint(
+              painter: BeforeAfterPainter(b, a), size: Size.infinite)),
       const Row(children: [
-        Icon(Icons.circle, size: 10, color: Colors.grey), SizedBox(width: 4), Text('before  '),
-        Icon(Icons.circle, size: 10, color: Colors.deepOrange), SizedBox(width: 4), Text('after'),
+        Icon(Icons.circle, size: 10, color: Colors.grey),
+        SizedBox(width: 4),
+        Text('before  '),
+        Icon(Icons.circle, size: 10, color: Colors.deepOrange),
+        SizedBox(width: 4),
+        Text('after'),
       ]),
     ]);
   }

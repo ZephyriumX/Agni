@@ -24,6 +24,16 @@ class Settings:
     max_body_bytes: int = 2_000_000          # ~35 s @ 60 Hz x3 channels is ~150 kB
     max_samples: int = 120 * 130             # 130 s @ 120 fps hard cap (high-speed capture path)
     register_per_hour: int = 30
+    signup_open: bool = True                  # AGNI_SIGNUP_OPEN=0 closes self-service sign-up
+    login_per_10min: int = 30                 # per client IP
+    max_failed_logins: int = 8                # then the account is locked for lockout_minutes
+    lockout_minutes: int = 15
+    # optional SMTP for e-mailed password-reset codes (recovery codes work without it)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
     capture: CaptureConfig = DEFAULT_CAPTURE_CONFIG   # FPS/timing policy; AGNI_CAPTURE_* env overrides
 
     @staticmethod
@@ -39,9 +49,19 @@ class Settings:
             cors_origins=_csv("AGNI_CORS_ORIGINS"),
             max_body_bytes=int(os.getenv("AGNI_MAX_BODY_BYTES", 2_000_000)),
             capture=CaptureConfig.from_env(),
+            signup_open=os.getenv("AGNI_SIGNUP_OPEN", "1").lower() not in ("0", "false", "no"),
+            smtp_host=os.getenv("AGNI_SMTP_HOST", ""),
+            smtp_port=int(os.getenv("AGNI_SMTP_PORT", 587)),
+            smtp_user=os.getenv("AGNI_SMTP_USER", ""),
+            smtp_password=os.getenv("AGNI_SMTP_PASSWORD", ""),
+            smtp_from=os.getenv("AGNI_SMTP_FROM", ""),
         )
         s.validate()
         return s
+
+    @property
+    def email_enabled(self) -> bool:
+        return bool(self.smtp_host)
 
     def validate(self) -> None:
         if self.storage == "memory" and self.env == "production":
