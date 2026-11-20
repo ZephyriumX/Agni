@@ -129,6 +129,24 @@ the project team. Neither is a clinical or participant study.
 
 ---
 
+## Project documents
+
+| Document | Files |
+|---|---|
+| End-term presentation (25 slides, university template) | [PPTX](docs/project/Agni-Pulse_End_Term_Presentation.pptx) · [PDF preview](docs/project/Agni-Pulse_End_Term_Presentation_preview.pdf) |
+| Demo video (72 s, AI narration) | [MP4](docs/media/agni-pulse-demo.mp4) · [captions (.srt)](docs/media/agni-pulse-demo.srt) · [narration script](docs/project/Agni-Pulse_Narration_Script.pdf) |
+| Project timeline (from 20 Apr 2026) | [Gantt chart](docs/project/Agni-Pulse_Gantt_Chart.pdf) · [timeline CSV](docs/project/Agni-Pulse_Timeline.csv) |
+| Responsibility chart | [PDF](docs/project/Agni-Pulse_Responsibility_Chart.pdf) |
+
+<details>
+<summary><b>Gantt chart and responsibilities</b></summary>
+
+![Gantt chart](docs/project/Agni-Pulse_Gantt_Chart.png)
+![Responsibility chart](docs/project/Agni-Pulse_Responsibility_Chart.png)
+</details>
+
+---
+
 ## Features
 
 * **Accounts**: e-mail and password, one session per device, sign out everywhere, change password, one-time recovery code
