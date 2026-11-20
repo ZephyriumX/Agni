@@ -10,14 +10,12 @@ phone. Nothing is claimed beyond what is listed.
 | Migration 003 on an existing database | Yes | applied on top of 001/002 in the test cluster; existing 125 v0.5 tests still pass; checksums enforced | n/a | n/a |
 | Docker image / Render blueprint | Yes | Dockerfile and `render.yaml` written; the image was **not built** here and nothing was deployed (needs your Render and Supabase accounts) | No | n/a |
 | Analytics engine (`analytics.py`) | Yes | 10 unit/integration tests with known answers (baseline stats, SD-based significance with noise floor, trends vs noise, meal grouping, descriptor effects, intervention pairing, contexts, window/fallback, streaks, quality) | n/a | n/a |
-| Flutter app 1.0 (auth, onboarding, home, insights + charts, history, scan detail, compare, diary, profile, server settings) | Yes | Static checks only: bracket balance, every project symbol imported where used, no unused project imports, manual type review. New Dart unit tests (`prakriti_test`, `format_test`) **not run** | **No** | **No** |
-| Capture validation, Dart port | Yes | Golden vectors shared with the Python tests; Dart side not run | No | No |
-| Android plugin: Camera2 YUV path, camera selection, high-speed path (`HsSession.kt`) | Yes | JVM unit tests for camera choice written, **not run**; high-speed GPU path untested on hardware (torch/AE-lock in high-speed mode are device-dependent; it logs every step) | No | No |
+| Flutter app 1.0 (auth, onboarding, home, insights + charts, history, scan detail, compare, diary, profile, server settings) | Yes | Built and run by the team on an Android phone (realme P3 5G) against the Supabase back end; scans recorded on 16, 18 and 19 Nov 2026 (see `docs/media/screens/` and `docs/media/evidence/supabase-scans-table.jpg`). Dart unit tests: run them with `flutter test` | **Yes** (Android) | **Yes** (Android) |
+| Capture validation, Dart port | Yes | Golden vectors shared with the Python tests; on the device every recorded scan reported PASS at 59.0–59.1 fps with 0.0–0.1 % dropped frames | Yes (Android) | Yes (Android) |
+| Android plugin: Camera2 YUV path, camera selection, high-speed path (`HsSession.kt`) | Yes | **YUV path device-tested** on a realme P3 5G (≈59 fps, torch, locked exposure/white balance). Camera-selection JVM tests written; high-speed GPU path not yet tried on a 30-fps-limited phone | Yes | YUV path: **Yes**; high-speed path: not yet |
 | iOS plugin (Swift AVFoundation) | Yes | Written without a Mac | No | No |
 
-Why the app is not compiled: no Flutter/Android SDK in the environment where it was written, and running a downloaded
-Dart SDK was not permitted there. On your PC: `flutter pub get && flutter analyze && flutter test && flutter run`.
-Paste any error output and it will be fixed.
+Device testing (Nov 2026): the Android app was built and used on a realme P3 5G with the cloud database. Baseline, after-meal and after-intervention scans, their comparisons and quality panels are shown in `docs/media/screens/`.
 
 Nothing here has been clinically validated. All fps/timing/SQI/analytics thresholds are engineering parameters
 (several marked ASSUMPTION in the code).

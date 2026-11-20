@@ -1,0 +1,96 @@
+1
+00:00:00,400 --> 00:00:03,920
+Every meal, every coffee, every stressful hour leaves a trace
+
+2
+00:00:03,920 --> 00:00:04,910
+in your pulse.
+
+3
+00:00:04,910 --> 00:00:06,470
+Most of us never see it.
+
+4
+00:00:06,470 --> 00:00:09,360
+Meet Agni-Pulse. All you need is your phone.
+
+5
+00:00:10,300 --> 00:00:12,200
+Rest a fingertip on the camera.
+
+6
+00:00:12,600 --> 00:00:15,920
+The torch lights the skin, and the camera reads the tiny
+
+7
+00:00:15,920 --> 00:00:19,360
+colour change of every heartbeat, sixty times a second.
+
+8
+00:00:19,360 --> 00:00:21,610
+First, it checks the recording itself:
+
+9
+00:00:21,610 --> 00:00:24,390
+frame timing, steadiness and signal quality.
+
+10
+00:00:24,390 --> 00:00:27,210
+If a scan isn't clean, it asks you to try again.
+
+11
+00:00:27,210 --> 00:00:30,980
+Then it builds the acceleration waveform and finds the a and b
+
+12
+00:00:30,980 --> 00:00:34,570
+waves, giving you heart rate, heart-rate variability, and b
+
+13
+00:00:34,570 --> 00:00:37,130
+over a, a marker of arterial stiffness.
+
+14
+00:00:37,130 --> 00:00:39,300
+Scan at rest to set your baseline.
+
+15
+00:00:39,600 --> 00:00:42,840
+After dinner, heart-rate variability halved, so Agni-Pulse
+
+16
+00:00:42,840 --> 00:00:44,920
+suggested a short breathing reset.
+
+17
+00:00:44,920 --> 00:00:48,010
+After a walk, the next scan showed full recovery.
+
+18
+00:00:49,800 --> 00:00:53,150
+Over time, it learns your normal, ranks the meals that suit
+
+19
+00:00:53,150 --> 00:00:55,770
+you, and shows which habits really help.
+
+20
+00:00:56,600 --> 00:01:00,820
+Under the hood: a native camera module, a FastAPI signal
+
+21
+00:01:00,820 --> 00:01:03,460
+engine and a secure cloud database.
+
+22
+00:01:03,460 --> 00:01:07,560
+Tested by 165 automated checks, and on a real phone.
+
+23
+00:01:07,560 --> 00:01:09,220
+Agni-Pulse. Know your normal.
+
+24
+00:01:09,220 --> 00:01:10,710
+See what changes it.
+
